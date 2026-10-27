@@ -10,8 +10,13 @@
     "build:electron": "pnpm --filter @dion/web build && pnpm --filter @dion/electron build",
     "dist:electron": "pnpm build:electron && pnpm --filter @dion/electron dist",
     "dist:electron:linux": "pnpm build:electron && pnpm --filter @dion/electron dist:linux",
+    "dist:electron:linux:x64": "pnpm build:electron && pnpm --filter @dion/electron dist:linux:x64",
+    "dist:electron:linux:arm64": "pnpm build:electron && pnpm --filter @dion/electron dist:linux:arm64",
+    "dist:electron:linux:all": "pnpm build:electron && pnpm --filter @dion/electron dist:linux:all",
     "dist:electron:win": "pnpm build:electron && pnpm --filter @dion/electron dist:win",
+    "dist:electron:win:all": "pnpm build:electron && pnpm --filter @dion/electron dist:win:all",
     "dist:electron:mac": "pnpm build:electron && pnpm --filter @dion/electron dist:mac",
+    "dist:electron:mac:all": "pnpm build:electron && pnpm --filter @dion/electron dist:mac:all",
     "start:electron": "pnpm --filter @dion/electron start"
   },
   "devDependencies": {

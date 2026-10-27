@@ -9,9 +9,17 @@
     "start": "electron .",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",
+    "dist:linux:x64": "electron-builder --linux --x64",
+    "dist:linux:arm64": "electron-builder --linux --arm64",
+    "dist:linux:all": "electron-builder --linux --x64 --arm64",
     "dist:mac": "electron-builder --mac",
+    "dist:mac:all": "electron-builder --mac --x64 --arm64 --universal",
     "dist:win": "electron-builder --win",
-    "dist:dir": "electron-builder --dir"
+    "dist:win:all": "electron-builder --win --x64 --arm64",
+    "dist:all": "electron-builder -mwl --x64 --arm64",
+    "dist:dir": "electron-builder --dir",
+    "dist:dir:arm64": "electron-builder --dir --arm64",
+    "dist:dir:x64": "electron-builder --dir --x64"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -30,17 +38,46 @@
     ],
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "category": "Video"
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64",
+            "universal"
+          ]
+        }
+      ],
       "category": "public.app-category.entertainment"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
     }
   }
 }
