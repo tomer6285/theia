@@ -3,7 +3,7 @@
 # ==============================================================================
 # Theia — Multi-Platform & Multi-Architecture Release Script
 # Builds Electron desktop releases for:
-#   - Linux:   AMD64 (x86_64) & ARM64 (aarch64)
+#   - Linux:   AMD64 (x86_64) & ARM64 (aarch64) [AppImage, Debian (.deb), Fedora (.rpm)]
 #   - Windows: AMD64 (x64)    & ARM64 (arm64)
 #   - macOS:   AMD64 (x64)    & ARM64 (Apple Silicon)
 # ==============================================================================
@@ -23,6 +23,8 @@ NC='\033[0m' # No Color
 BUILD_LINUX=true
 BUILD_WIN=true
 BUILD_MAC=true
+BUILD_RPM=true
+RPM_ONLY=false
 DIR_ONLY=false
 SKIP_TESTS=false
 
@@ -33,6 +35,16 @@ for arg in "$@"; do
       BUILD_LINUX=true
       BUILD_WIN=false
       BUILD_MAC=false
+      ;;
+    --rpm-only|--rpm)
+      BUILD_LINUX=false
+      BUILD_WIN=false
+      BUILD_MAC=false
+      BUILD_RPM=true
+      RPM_ONLY=true
+      ;;
+    --skip-rpm|--no-rpm)
+      BUILD_RPM=false
       ;;
     --win-only)
       BUILD_LINUX=false
@@ -54,7 +66,9 @@ for arg in "$@"; do
       echo "Usage: ./release.sh [OPTIONS]"
       echo ""
       echo "Options:"
-      echo "  --linux-only   Build only Linux targets (amd64, arm64)"
+      echo "  --linux-only   Build only Linux targets (AppImage, deb, Fedora rpm for amd64, arm64)"
+      echo "  --rpm-only     Build only Fedora RPM packages (amd64, arm64)"
+      echo "  --skip-rpm     Skip Fedora RPM package generation during Linux build"
       echo "  --win-only     Build only Windows targets (amd64, arm64)"
       echo "  --mac-only     Build only macOS targets (amd64, arm64)"
       echo "  --dir          Package into unpacked directories instead of installers"
@@ -70,6 +84,20 @@ echo "=========================================================="
 echo "   Theia — Multi-Arch Release Build Pipeline"
 echo "=========================================================="
 echo -e "${NC}"
+
+# Check rpmbuild tool availability for RPM builds
+HAS_RPMBUILD=true
+if ! command -v rpmbuild &> /dev/null; then
+  HAS_RPMBUILD=false
+fi
+
+if [ "$RPM_ONLY" = true ] && [ "$HAS_RPMBUILD" = false ]; then
+  echo -e "${RED}ERROR: 'rpmbuild' is required to package Fedora RPM packages.${NC}"
+  echo -e "Please install it with:"
+  echo -e "  - Ubuntu/Debian: sudo apt-get install rpm"
+  echo -e "  - Fedora/RHEL:   sudo dnf install rpm-build"
+  exit 1
+fi
 
 # 1. Verification & Tests
 if [ "$SKIP_TESTS" = false ]; then
@@ -93,12 +121,31 @@ if [ "$DIR_ONLY" = true ]; then
 fi
 
 # 3. Linux Multi-Arch Builds (amd64 + arm64)
-if [ "$BUILD_LINUX" = true ]; then
-  echo -e "\n${YELLOW}==> Packaging Linux AMD64 (x86_64)...${NC}"
-  npx electron-builder --linux --x64 $EXTRA_BUILDER_FLAGS
+if [ "$BUILD_LINUX" = true ] || [ "$RPM_ONLY" = true ]; then
+  if [ "$RPM_ONLY" = true ]; then
+    echo -e "\n${YELLOW}==> Packaging Fedora RPM AMD64 (x86_64)...${NC}"
+    npx electron-builder --linux rpm --x64 $EXTRA_BUILDER_FLAGS
 
-  echo -e "\n${YELLOW}==> Packaging Linux ARM64 (aarch64)...${NC}"
-  npx electron-builder --linux --arm64 $EXTRA_BUILDER_FLAGS
+    echo -e "\n${YELLOW}==> Packaging Fedora RPM ARM64 (aarch64)...${NC}"
+    npx electron-builder --linux rpm --arm64 $EXTRA_BUILDER_FLAGS
+  else
+    LINUX_TARGETS=("AppImage" "deb")
+    if [ "$BUILD_RPM" = true ]; then
+      if [ "$HAS_RPMBUILD" = true ]; then
+        LINUX_TARGETS+=("rpm")
+      else
+        echo -e "\n${YELLOW}==> Warning: 'rpmbuild' not detected. Skipping Fedora RPM packages.${NC}"
+        echo -e "${YELLOW}    To enable Fedora RPM packages, install rpm: sudo apt-get install rpm (Ubuntu/Debian) or sudo dnf install rpm-build (Fedora/RHEL)${NC}"
+      fi
+    fi
+
+    TARGETS_STR="${LINUX_TARGETS[*]}"
+    echo -e "\n${YELLOW}==> Packaging Linux AMD64 (x86_64) [${TARGETS_STR}]...${NC}"
+    npx electron-builder --linux "${LINUX_TARGETS[@]}" --x64 $EXTRA_BUILDER_FLAGS
+
+    echo -e "\n${YELLOW}==> Packaging Linux ARM64 (aarch64) [${TARGETS_STR}]...${NC}"
+    npx electron-builder --linux "${LINUX_TARGETS[@]}" --arm64 $EXTRA_BUILDER_FLAGS
+  fi
 fi
 
 # 4. Windows Multi-Arch Builds (amd64 + arm64)
@@ -129,4 +176,8 @@ if [ -d "apps/electron/release" ]; then
   ls -lh apps/electron/release
 fi
 
-echo -e "\n${CYAN}All OS versions for AMD64 and ARM have been successfully built!${NC}\n"
+if [ "$RPM_ONLY" = true ]; then
+  echo -e "\n${CYAN}Fedora RPM packages for AMD64 and ARM64 have been successfully built!${NC}\n"
+else
+  echo -e "\n${CYAN}All requested OS and package versions for AMD64 and ARM have been successfully built!${NC}\n"
+fi

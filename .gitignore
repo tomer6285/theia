@@ -8,6 +8,7 @@ build/
 .output/
 .next/
 out/
+apps/
 
 # Turbo
 .turbo/
@@ -35,3 +36,5 @@ pnpm-debug.log*
 # OS Files
 .DS_Store
 Thumbs.db
+
+release.sh
