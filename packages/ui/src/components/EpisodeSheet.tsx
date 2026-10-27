@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MediaItem, Episode, SeasonInfo, WatchProgress } from '@dion/core';
+import { MediaItem, Episode, SeasonInfo, WatchProgress } from '@theia/core';
 import { colors } from '../theme/colors';
 import { TouchPill } from './TouchPill';
 

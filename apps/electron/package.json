@@ -1,8 +1,8 @@
 {
-  "name": "@dion/electron",
+  "name": "@theia/electron",
   "version": "0.1.0",
-  "description": "Dion Site and Webapp",
-  "homepage": "https://github.com/tomer6285/dion-tc",
+  "description": "Theia Site and Webapp",
+  "homepage": "https://github.com/tomer6285/theia",
   "author": "Tomer Chalabi <tomerchalabi@gmail.com>",
   "private": true,
   "main": "./dist/main.js",
@@ -30,8 +30,8 @@
     "typescript": "^5.8.2"
   },
   "build": {
-    "appId": "com.dion.touch",
-    "productName": "Dion Touch",
+    "appId": "com.theia.app",
+    "productName": "Theia",
     "directories": {
       "output": "release"
     },
@@ -60,8 +60,8 @@
       "category": "Video"
     },
     "deb": {
-      "packageName": "dion-touch",
-      "artifactName": "dion-touch_${version}_${arch}.${ext}"
+      "packageName": "theia",
+      "artifactName": "theia_${version}_${arch}.${ext}"
     },
     "mac": {
       "target": [

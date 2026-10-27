@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { MediaItem, StreamSource, Episode, dionStore } from '@dion/core';
-import { VideoPlayer } from '@dion/player';
+import { MediaItem, StreamSource, Episode, theiaStore } from '@theia/core';
+import { VideoPlayer } from '@theia/player';
 import { BottomNav, TabType } from './components/BottomNav';
 import { DiscoverView } from './components/DiscoverView';
 import { ContinueWatchingView } from './components/ContinueWatchingView';
@@ -20,7 +20,7 @@ export const App: React.FC = () => {
     episode?: Episode;
   } | null>(null);
 
-  const history = dionStore.getState().history;
+  const history = theiaStore.getState().history;
   const continueCount = history.filter((h) => !h.progress.completed && h.progress.percentage > 1).length;
 
   const handleStartPlay = (

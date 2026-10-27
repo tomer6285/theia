@@ -5,9 +5,9 @@ import {
   providerManager,
   StreamSource,
   Episode,
-  dionStore,
-} from '@dion/core';
-import { colors, TouchPill, EpisodeSheet } from '@dion/ui';
+  theiaStore,
+} from '@theia/core';
+import { colors, TouchPill, EpisodeSheet } from '@theia/ui';
 
 interface MediaDetailModalProps {
   media: MediaItem;
@@ -31,8 +31,8 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | undefined>(undefined);
 
   // Sync state
-  const isFav = dionStore.getState().isFavorite(media.id);
-  const progress = dionStore.getState().getProgress(media.id, selectedEpisode?.id);
+  const isFav = theiaStore.getState().isFavorite(media.id);
+  const progress = theiaStore.getState().getProgress(media.id, selectedEpisode?.id);
 
   // Fetch full details if episodes/cast are missing
   useEffect(() => {
@@ -274,7 +274,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             {/* Favorite Button */}
             <button
               type="button"
-              onClick={() => dionStore.getState().toggleFavorite(media)}
+              onClick={() => theiaStore.getState().toggleFavorite(media)}
               style={{
                 width: 50,
                 height: 50,

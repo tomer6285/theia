@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ==============================================================================
-# Dion Touch (dion-tc) — Multi-Platform & Multi-Architecture Release Script
+# Theia — Multi-Platform & Multi-Architecture Release Script
 # Builds Electron desktop releases for:
 #   - Linux:   AMD64 (x86_64) & ARM64 (aarch64)
 #   - Windows: AMD64 (x64)    & ARM64 (arm64)
@@ -67,22 +67,22 @@ done
 
 echo -e "${CYAN}"
 echo "=========================================================="
-echo "   Dion Touch — Multi-Arch Release Build Pipeline"
+echo "   Theia — Multi-Arch Release Build Pipeline"
 echo "=========================================================="
 echo -e "${NC}"
 
 # 1. Verification & Tests
 if [ "$SKIP_TESTS" = false ]; then
-  echo -e "${YELLOW}==> Running unit tests in @dion/core...${NC}"
-  pnpm --filter @dion/core test
+  echo -e "${YELLOW}==> Running unit tests in @theia/core...${NC}"
+  pnpm --filter @theia/core test
 else
   echo -e "${YELLOW}==> Skipping unit tests (--skip-tests specified)${NC}"
 fi
 
 # 2. Compile Web Frontend & Monorepo Packages
 echo -e "\n${YELLOW}==> Building web frontend and dependent packages with Turborepo...${NC}"
-pnpm --filter @dion/web build
-pnpm --filter @dion/electron build
+pnpm --filter @theia/web build
+pnpm --filter @theia/electron build
 
 # Navigate to electron package directory for builder
 cd apps/electron

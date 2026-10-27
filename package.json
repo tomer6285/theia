@@ -1,5 +1,5 @@
 {
-  "name": "dion-tc-monorepo",
+  "name": "theia-monorepo",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,17 +7,17 @@
     "dev": "turbo run dev",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "build:electron": "pnpm --filter @dion/web build && pnpm --filter @dion/electron build",
-    "dist:electron": "pnpm build:electron && pnpm --filter @dion/electron dist",
-    "dist:electron:linux": "pnpm build:electron && pnpm --filter @dion/electron dist:linux",
-    "dist:electron:linux:x64": "pnpm build:electron && pnpm --filter @dion/electron dist:linux:x64",
-    "dist:electron:linux:arm64": "pnpm build:electron && pnpm --filter @dion/electron dist:linux:arm64",
-    "dist:electron:linux:all": "pnpm build:electron && pnpm --filter @dion/electron dist:linux:all",
-    "dist:electron:win": "pnpm build:electron && pnpm --filter @dion/electron dist:win",
-    "dist:electron:win:all": "pnpm build:electron && pnpm --filter @dion/electron dist:win:all",
-    "dist:electron:mac": "pnpm build:electron && pnpm --filter @dion/electron dist:mac",
-    "dist:electron:mac:all": "pnpm build:electron && pnpm --filter @dion/electron dist:mac:all",
-    "start:electron": "pnpm --filter @dion/electron start"
+    "build:electron": "pnpm --filter @theia/web build && pnpm --filter @theia/electron build",
+    "dist:electron": "pnpm build:electron && pnpm --filter @theia/electron dist",
+    "dist:electron:linux": "pnpm build:electron && pnpm --filter @theia/electron dist:linux",
+    "dist:electron:linux:x64": "pnpm build:electron && pnpm --filter @theia/electron dist:linux:x64",
+    "dist:electron:linux:arm64": "pnpm build:electron && pnpm --filter @theia/electron dist:linux:arm64",
+    "dist:electron:linux:all": "pnpm build:electron && pnpm --filter @theia/electron dist:linux:all",
+    "dist:electron:win": "pnpm build:electron && pnpm --filter @theia/electron dist:win",
+    "dist:electron:win:all": "pnpm build:electron && pnpm --filter @theia/electron dist:win:all",
+    "dist:electron:mac": "pnpm build:electron && pnpm --filter @theia/electron dist:mac",
+    "dist:electron:mac:all": "pnpm build:electron && pnpm --filter @theia/electron dist:mac:all",
+    "start:electron": "pnpm --filter @theia/electron start"
   },
   "devDependencies": {
     "turbo": "^2.4.4",

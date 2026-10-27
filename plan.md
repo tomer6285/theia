@@ -1,4 +1,4 @@
-# Dion Touch (dion-tc) — Implementation Plan
+# Theia — Implementation Plan
 
 A touch-first, cross-platform port of [Dion](https://github.com/tomer6285/dion) targeting **React Native (Android APK)**, **Web (PWA)**, and **Desktop (Electron)** from a unified monorepo.
 
@@ -9,7 +9,7 @@ A touch-first, cross-platform port of [Dion](https://github.com/tomer6285/dion) 
 We will use **Turborepo** with **pnpm** and **Expo (React Native)**. To support both native mobile (with hardware-accelerated ExoPlayer) and Web/Electron without duplicating business logic, the codebase is split into modular packages:
 
 ```text
-dion-tc/
+theia/
 ├── packages/
 │   ├── core/                  # Pure TypeScript business logic (Zero UI dependencies)
 │   │   ├── src/

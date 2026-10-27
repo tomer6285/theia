@@ -1,5 +1,5 @@
 import React from 'react';
-import { MediaItem, WatchProgress } from '@dion/core';
+import { MediaItem, WatchProgress } from '@theia/core';
 import { colors } from '../theme/colors';
 
 export interface MediaCardProps {

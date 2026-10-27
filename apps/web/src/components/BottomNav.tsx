@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors } from '@dion/ui';
+import { colors } from '@theia/ui';
 
 export type TabType = 'discover' | 'continue' | 'library' | 'settings';
 

@@ -12,7 +12,7 @@ import {
   parseSubtitles,
   offsetSubtitlesVTT,
 } from '../src/subtitles';
-import { dionStore } from '../src/storage';
+import { theiaStore, theiaStore } from '../src/storage';
 
 describe('Crypto - VidLink XSalsa20-Poly1305', () => {
   it('should encrypt and decrypt mediaId token correctly', () => {
@@ -100,7 +100,7 @@ describe('Provider Manager', () => {
 
 describe('Store & Persistence', () => {
   it('should record watch progress and update history', () => {
-    const store = dionStore.getState();
+    const store = theiaStore.getState();
 
     store.updateProgress(
       {
@@ -118,7 +118,7 @@ describe('Store & Persistence', () => {
       }
     );
 
-    const updated = dionStore.getState();
+    const updated = theiaStore.getState();
     const progress = updated.getProgress('tt1375666');
     expect(progress?.positionSeconds).toBe(120);
     expect(updated.history.length).toBeGreaterThan(0);
@@ -126,7 +126,7 @@ describe('Store & Persistence', () => {
   });
 
   it('should toggle favorites and handle subtitle offsets', () => {
-    const store = dionStore.getState();
+    const store = theiaStore.getState();
 
     store.toggleFavorite({
       id: 'tt0903747',
@@ -134,9 +134,9 @@ describe('Store & Persistence', () => {
       type: 'series',
     });
 
-    expect(dionStore.getState().isFavorite('tt0903747')).toBe(true);
+    expect(theiaStore.getState().isFavorite('tt0903747')).toBe(true);
 
     store.setSubtitleOffset('tt0903747', 150);
-    expect(dionStore.getState().getSubtitleOffset('tt0903747')).toBe(150);
+    expect(theiaStore.getState().getSubtitleOffset('tt0903747')).toBe(150);
   });
 });

@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MediaItem, cinemeta, providerManager, StreamSource, Episode } from '@dion/core';
+import { MediaItem, cinemeta, providerManager, StreamSource, Episode } from '@theia/core';
 
 export default function MediaDetailScreen() {
   const router = useRouter();

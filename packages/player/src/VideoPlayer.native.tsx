@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { dionStore } from '@dion/core';
+import { theiaStore } from '@theia/core';
 import { VideoPlayerProps, AspectRatioMode } from './types';
 
 /**
@@ -27,7 +27,7 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
 
   // Load saved progress
   useEffect(() => {
-    const saved = dionStore.getState().getProgress(media.id, episode?.id);
+    const saved = theiaStore.getState().getProgress(media.id, episode?.id);
     if (saved && saved.positionSeconds > 5 && !saved.completed) {
       setCurrentTime(saved.positionSeconds);
     }

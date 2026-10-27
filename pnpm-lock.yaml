@@ -187,13 +187,13 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@dion/core':
+      '@theia/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@dion/player':
+      '@theia/player':
         specifier: workspace:*
         version: link:../../packages/player
-      '@dion/ui':
+      '@theia/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       expo:
@@ -239,13 +239,13 @@ importers:
 
   apps/web:
     dependencies:
-      '@dion/core':
+      '@theia/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@dion/player':
+      '@theia/player':
         specifier: workspace:*
         version: link:../../packages/player
-      '@dion/ui':
+      '@theia/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       react:
@@ -292,10 +292,10 @@ importers:
 
   packages/player:
     dependencies:
-      '@dion/core':
+      '@theia/core':
         specifier: workspace:*
         version: link:../core
-      '@dion/ui':
+      '@theia/ui':
         specifier: workspace:*
         version: link:../ui
       hls.js:
@@ -320,7 +320,7 @@ importers:
 
   packages/ui:
     dependencies:
-      '@dion/core':
+      '@theia/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

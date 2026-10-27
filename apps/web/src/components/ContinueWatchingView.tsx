@@ -1,13 +1,13 @@
 import React from 'react';
-import { dionStore, MediaItem } from '@dion/core';
-import { colors, MediaCard } from '@dion/ui';
+import { theiaStore, MediaItem } from '@theia/core';
+import { colors, MediaCard } from '@theia/ui';
 
 interface ContinueWatchingViewProps {
   onSelectMedia: (media: MediaItem) => void;
 }
 
 export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSelectMedia }) => {
-  const history = dionStore.getState().history;
+  const history = theiaStore.getState().history;
   const inProgress = history.filter((h) => !h.progress.completed && h.progress.percentage > 1);
 
   return (
@@ -58,8 +58,8 @@ export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSe
                 width="100%"
                 onPress={() => onSelectMedia(media)}
                 progress={progress}
-                isFavorite={dionStore.getState().isFavorite(media.id)}
-                onToggleFavorite={() => dionStore.getState().toggleFavorite(media)}
+                isFavorite={theiaStore.getState().isFavorite(media.id)}
+                onToggleFavorite={() => theiaStore.getState().toggleFavorite(media)}
               />
               {progress.episode && (
                 <span style={{ fontSize: '12px', color: colors.accent.primary, fontWeight: 600 }}>

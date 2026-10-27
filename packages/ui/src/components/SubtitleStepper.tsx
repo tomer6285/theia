@@ -1,5 +1,5 @@
 import React from 'react';
-import { SubtitleTrack } from '@dion/core';
+import { SubtitleTrack } from '@theia/core';
 import { colors } from '../theme/colors';
 import { TouchSlider } from './TouchSlider';
 import { TouchPill } from './TouchPill';

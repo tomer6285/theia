@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { dionStore, UserSettings } from '@dion/core';
-import { colors, TouchPill } from '@dion/ui';
+import { theiaStore, UserSettings } from '@theia/core';
+import { colors, TouchPill } from '@theia/ui';
 
 export const SettingsView: React.FC = () => {
-  const settings = dionStore.getState().settings;
+  const settings = theiaStore.getState().settings;
   const [proxyUrl, setProxyUrl] = useState(settings.proxyUrl || '');
   const [autoPlayNext, setAutoPlayNext] = useState(settings.autoPlayNext);
   const [savedToast, setSavedToast] = useState(false);
 
   const handleSave = () => {
-    dionStore.getState().updateSettings({
+    theiaStore.getState().updateSettings({
       proxyUrl,
       autoPlayNext,
     });
@@ -53,7 +53,7 @@ export const SettingsView: React.FC = () => {
           type="text"
           value={proxyUrl}
           onChange={(e) => setProxyUrl(e.target.value)}
-          placeholder="https://dion-proxy.your-worker.workers.dev"
+          placeholder="https://theia-proxy.your-worker.workers.dev"
           style={{
             height: 44,
             borderRadius: 10,
@@ -117,7 +117,7 @@ export const SettingsView: React.FC = () => {
           Active Scraper Providers
         </h3>
         <p style={{ margin: 0, fontSize: '13px', color: colors.text.muted }}>
-          Dion Touch queries providers in parallel with failover:
+          Theia queries providers in parallel with failover:
         </p>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -155,7 +155,7 @@ export const SettingsView: React.FC = () => {
       {/* App Info */}
       <div style={{ marginTop: 20, borderTop: `1px solid ${colors.border.subtle}`, paddingTop: 16 }}>
         <div style={{ fontSize: '12px', color: colors.text.muted, lineHeight: '1.6' }}>
-          <strong>Dion Touch v0.1.0</strong> • Pure TypeScript Monorepo<br />
+          <strong>Theia v0.1.0</strong> • Pure TypeScript Monorepo<br />
           React Native (Android APK) • Web PWA • Electron Desktop<br />
           Stremio Cinemeta API • XSalsa20-Poly1305 Native Decryption
         </div>

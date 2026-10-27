@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Hls from 'hls.js';
-import { dionStore, StreamSource, formatSubtitleTimestamp } from '@dion/core';
-import { colors, TouchSlider, SubtitleStepper, TouchPill } from '@dion/ui';
+import { theiaStore, StreamSource, formatSubtitleTimestamp } from '@theia/core';
+import { colors, TouchSlider, SubtitleStepper, TouchPill } from '@theia/ui';
 import { VideoPlayerProps, AspectRatioMode } from './types';
 import { GestureCoordinator } from './gestures/coordinator';
 
@@ -52,8 +52,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   // Load saved resume time and subtitle offset
   const mediaKey = episode ? episode.id : media.id;
   useEffect(() => {
-    const saved = dionStore.getState().getProgress(media.id, episode?.id);
-    const savedOffset = dionStore.getState().getSubtitleOffset(media.id);
+    const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+    const savedOffset = theiaStore.getState().getSubtitleOffset(media.id);
     setSubtitleOffsetMs(savedOffset);
 
     if (initialTime !== undefined) {
@@ -77,7 +77,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     let streamUrl = stream.url;
 
     // Route through edge proxy if required and configured
-    const proxyUrl = dionStore.getState().settings.proxyUrl;
+    const proxyUrl = theiaStore.getState().settings.proxyUrl;
     if (stream.requiresProxy && proxyUrl) {
       const referer = stream.headers?.Referer || 'https://vixsrc.to/';
       streamUrl = `${proxyUrl}?url=${encodeURIComponent(stream.url)}&referer=${encodeURIComponent(referer)}`;
@@ -142,7 +142,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         const percentage = (time / duration) * 100;
         const completed = percentage > 92;
 
-        dionStore.getState().updateProgress(
+        theiaStore.getState().updateProgress(
           {
             mediaId: media.id,
             episodeId: episode?.id,
@@ -814,7 +814,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         offsetMs={subtitleOffsetMs}
         onOffsetChange={(offset) => {
           setSubtitleOffsetMs(offset);
-          dionStore.getState().setSubtitleOffset(media.id, offset);
+          theiaStore.getState().setSubtitleOffset(media.id, offset);
         }}
         tracks={stream.subtitles}
         selectedTrackId={selectedSubId}

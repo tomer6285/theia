@@ -3,8 +3,8 @@ import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { MediaItem, StreamSource, Episode } from '@dion/core';
-import { VideoPlayer } from '@dion/player';
+import { MediaItem, StreamSource, Episode } from '@theia/core';
+import { VideoPlayer } from '@theia/player';
 
 export default function PlayerScreen() {
   const router = useRouter();
@@ -20,13 +20,13 @@ export default function PlayerScreen() {
 
   useEffect(() => {
     // Keep screen awake while playing
-    activateKeepAwakeAsync('DION_PLAYER');
+    activateKeepAwakeAsync('THEIA_PLAYER');
 
     // Lock to landscape orientation
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
 
     return () => {
-      deactivateKeepAwake('DION_PLAYER');
+      deactivateKeepAwake('THEIA_PLAYER');
       ScreenOrientation.unlockAsync();
     };
   }, []);

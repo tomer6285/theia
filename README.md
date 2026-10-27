@@ -1,4 +1,4 @@
-# Dion Touch (`dion-tc`)
+# Theia
 
 > Touch-first, cross-platform port of [Dion](https://github.com/tomer6285/dion) targeting **React Native (Android APK)**, **Web (PWA)**, and **Desktop (Electron)** from a unified monorepo.
 
@@ -7,7 +7,7 @@
 ## Architecture Overview
 
 ```text
-dion-tc/
+theia/
 ├── packages/
 │   ├── core/                  # Pure TypeScript business logic (Zero UI dependencies)
 │   │   ├── src/
@@ -64,23 +64,23 @@ pnpm install
 ```bash
 pnpm test
 ```
-Runs the full Vitest suite in `@dion/core` verifying XSalsa20-Poly1305 encryption/decryption, Cinemeta parsing, Provider Manager failover, Subtitle cue offsetting, and Zustand state persistence.
+Runs the full Vitest suite in `@theia/core` verifying XSalsa20-Poly1305 encryption/decryption, Cinemeta parsing, Provider Manager failover, Subtitle cue offsetting, and Zustand state persistence.
 
 ### 3. Build All Packages
 ```bash
 pnpm build
 ```
-Uses **Turborepo** to build `@dion/core`, `@dion/ui`, `@dion/player`, `@dion/edge-proxy`, `@dion/web`, and `@dion/electron`.
+Uses **Turborepo** to build `@theia/core`, `@theia/ui`, `@theia/player`, `@theia/edge-proxy`, `@theia/web`, and `@theia/electron`.
 
 ### 4. Run Web Application
 ```bash
-pnpm --filter @dion/web dev
+pnpm --filter @theia/web dev
 ```
 Starts the Vite dev server at `http://localhost:3000`.
 
 ### 5. Run Electron Desktop App
 ```bash
-pnpm --filter @dion/electron start
+pnpm --filter @theia/electron start
 ```
 
 ### 6. Build Android APK

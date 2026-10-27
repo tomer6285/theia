@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MediaItem, cinemeta, dionStore } from '@dion/core';
-import { colors, SearchBar, TouchPill, MediaCard } from '@dion/ui';
+import { MediaItem, cinemeta, theiaStore } from '@theia/core';
+import { colors, SearchBar, TouchPill, MediaCard } from '@theia/ui';
 
 interface DiscoverViewProps {
   onSelectMedia: (media: MediaItem) => void;
@@ -81,10 +81,10 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectMedia }) => 
                 fontSize: '16px',
               }}
             >
-              D
+              T
             </div>
             <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#fff' }}>
-              Dion <span style={{ color: colors.accent.primary }}>Touch</span>
+              The<span style={{ color: colors.accent.primary }}>ia</span>
             </h1>
           </div>
         </div>
@@ -157,9 +157,9 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectMedia }) => 
                   media={item}
                   width="100%"
                   onPress={() => onSelectMedia(item)}
-                  progress={dionStore.getState().getProgress(item.id)}
-                  isFavorite={dionStore.getState().isFavorite(item.id)}
-                  onToggleFavorite={() => dionStore.getState().toggleFavorite(item)}
+                  progress={theiaStore.getState().getProgress(item.id)}
+                  isFavorite={theiaStore.getState().isFavorite(item.id)}
+                  onToggleFavorite={() => theiaStore.getState().toggleFavorite(item)}
                 />
               ))}
             </div>
@@ -193,9 +193,9 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectMedia }) => 
                     media={item}
                     width={150}
                     onPress={() => onSelectMedia(item)}
-                    progress={dionStore.getState().getProgress(item.id)}
-                    isFavorite={dionStore.getState().isFavorite(item.id)}
-                    onToggleFavorite={() => dionStore.getState().toggleFavorite(item)}
+                    progress={theiaStore.getState().getProgress(item.id)}
+                    isFavorite={theiaStore.getState().isFavorite(item.id)}
+                    onToggleFavorite={() => theiaStore.getState().toggleFavorite(item)}
                   />
                 ))}
               </div>
@@ -225,9 +225,9 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectMedia }) => 
                     media={item}
                     width={150}
                     onPress={() => onSelectMedia(item)}
-                    progress={dionStore.getState().getProgress(item.id)}
-                    isFavorite={dionStore.getState().isFavorite(item.id)}
-                    onToggleFavorite={() => dionStore.getState().toggleFavorite(item)}
+                    progress={theiaStore.getState().getProgress(item.id)}
+                    isFavorite={theiaStore.getState().isFavorite(item.id)}
+                    onToggleFavorite={() => theiaStore.getState().toggleFavorite(item)}
                   />
                 ))}
               </div>

@@ -1,3 +1,3 @@
-name = "dion-edge-proxy"
+name = "theia-edge-proxy"
 main = "src/worker.ts"
 compatibility_date = "2024-01-01"

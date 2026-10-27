@@ -1,5 +1,5 @@
 {
-  "name": "@dion/web",
+  "name": "@theia/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@dion/core": "workspace:*",
-    "@dion/player": "workspace:*",
-    "@dion/ui": "workspace:*",
+    "@theia/core": "workspace:*",
+    "@theia/player": "workspace:*",
+    "@theia/ui": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

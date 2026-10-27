@@ -1,6 +1,6 @@
 {
-  "name": "Dion Touch",
-  "short_name": "Dion",
+  "name": "Theia",
+  "short_name": "Theia",
   "description": "Touch-first media streaming player",
   "start_url": "/",
   "display": "standalone",

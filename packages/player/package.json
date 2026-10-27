@@ -1,5 +1,5 @@
 {
-  "name": "@dion/player",
+  "name": "@theia/player",
   "version": "0.1.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -8,8 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dion/core": "workspace:*",
-    "@dion/ui": "workspace:*",
+    "@theia/core": "workspace:*",
+    "@theia/ui": "workspace:*",
     "hls.js": "^1.5.17"
   },
   "peerDependencies": {

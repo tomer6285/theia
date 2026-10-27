@@ -1,6 +1,9 @@
 import { contextBridge } from 'electron';
 
-contextBridge.exposeInMainWorld('dionElectron', {
+const electronApi = {
   isElectron: true,
   platform: process.platform,
-});
+};
+
+contextBridge.exposeInMainWorld('theiaElectron', electronApi);
+contextBridge.exposeInMainWorld('dionElectron', electronApi);

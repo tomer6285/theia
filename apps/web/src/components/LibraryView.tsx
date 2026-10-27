@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { dionStore, MediaItem } from '@dion/core';
-import { colors, TouchPill, MediaCard } from '@dion/ui';
+import { theiaStore, MediaItem } from '@theia/core';
+import { colors, TouchPill, MediaCard } from '@theia/ui';
 
 interface LibraryViewProps {
   onSelectMedia: (media: MediaItem) => void;
@@ -10,8 +10,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia }) => {
   const [activeTab, setActiveTab] = useState<'favorites' | 'history'>('favorites');
   const [, setTick] = useState(0); // For forcing re-render on state changes
 
-  const favorites = dionStore.getState().favorites;
-  const history = dionStore.getState().history;
+  const favorites = theiaStore.getState().favorites;
+  const history = theiaStore.getState().history;
 
   return (
     <div style={{ padding: '20px 20px 100px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -48,7 +48,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia }) => {
             type="button"
             onClick={() => {
               if (window.confirm('Clear all playback history?')) {
-                dionStore.getState().clearHistory();
+                theiaStore.getState().clearHistory();
                 setTick((t) => t + 1);
               }
             }}
@@ -99,10 +99,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia }) => {
                   media={item}
                   width="100%"
                   onPress={() => onSelectMedia(item)}
-                  progress={dionStore.getState().getProgress(item.id)}
+                  progress={theiaStore.getState().getProgress(item.id)}
                   isFavorite={true}
                   onToggleFavorite={() => {
-                    dionStore.getState().toggleFavorite(item);
+                    theiaStore.getState().toggleFavorite(item);
                     setTick((t) => t + 1);
                   }}
                 />
@@ -146,9 +146,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia }) => {
                   width="100%"
                   onPress={() => onSelectMedia(media)}
                   progress={progress}
-                  isFavorite={dionStore.getState().isFavorite(media.id)}
+                  isFavorite={theiaStore.getState().isFavorite(media.id)}
                   onToggleFavorite={() => {
-                    dionStore.getState().toggleFavorite(media);
+                    theiaStore.getState().toggleFavorite(media);
                     setTick((t) => t + 1);
                   }}
                 />

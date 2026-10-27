@@ -11,7 +11,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MediaItem, cinemeta, dionStore } from '@dion/core';
+import { MediaItem, cinemeta, theiaStore } from '@theia/core';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -62,10 +62,10 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoBadge}>
-          <Text style={styles.logoText}>D</Text>
+          <Text style={styles.logoText}>T</Text>
         </View>
         <Text style={styles.headerTitle}>
-          Dion <Text style={{ color: '#06b6d4' }}>Touch</Text>
+          The<Text style={{ color: '#06b6d4' }}>ia</Text>
         </Text>
       </View>
 

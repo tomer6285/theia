@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Dion Touch",
-    "slug": "dion-touch",
+    "name": "Theia",
+    "slug": "theia",
     "version": "0.1.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -13,10 +13,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dion.touch"
+      "bundleIdentifier": "com.theia.app"
     },
     "android": {
-      "package": "com.dion.touch",
+      "package": "com.theia.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#09090b"
@@ -36,7 +36,7 @@
         }
       ]
     ],
-    "scheme": "dion",
+    "scheme": "theia",
     "experiments": {
       "typedRoutes": true
     }

@@ -1,4 +1,4 @@
-import { StreamSource, MediaItem, Episode, SubtitleTrack } from '@dion/core';
+import { StreamSource, MediaItem, Episode, SubtitleTrack } from '@theia/core';
 
 export type AspectRatioMode = 'fit' | 'fill' | '16:9';
 

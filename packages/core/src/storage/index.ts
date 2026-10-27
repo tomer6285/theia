@@ -81,7 +81,8 @@ const DEFAULT_SETTINGS: UserSettings = {
 };
 
 let currentAdapter: StorageAdapter = new DefaultStorageAdapter();
-const STORAGE_KEY = 'dion_tc_store';
+const STORAGE_KEY = 'theia_store';
+const LEGACY_STORAGE_KEY = 'dion_tc_store';
 
 export function setStorageAdapter(adapter: StorageAdapter) {
   currentAdapter = adapter;
@@ -89,7 +90,7 @@ export function setStorageAdapter(adapter: StorageAdapter) {
 
 export function loadStoredState(): Partial<WatchState> {
   try {
-    const raw = currentAdapter.getItem(STORAGE_KEY);
+    const raw = currentAdapter.getItem(STORAGE_KEY) || currentAdapter.getItem(LEGACY_STORAGE_KEY);
     if (raw && typeof raw === 'string') {
       return JSON.parse(raw);
     }
@@ -124,7 +125,7 @@ export function saveState(state: {
 
 const initialSaved = loadStoredState();
 
-export const dionStore = createStore<WatchState>((set, get) => ({
+export const theiaStore = createStore<WatchState>((set, get) => ({
   progress: initialSaved.progress || {},
   history: initialSaved.history || [],
   favorites: initialSaved.favorites || [],
@@ -253,3 +254,5 @@ export const dionStore = createStore<WatchState>((set, get) => ({
     });
   },
 }));
+
+export const dionStore = theiaStore;

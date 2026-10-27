@@ -27,7 +27,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 500,
     backgroundColor: '#09090b',
-    title: 'Dion Touch',
+    title: 'Theia',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
