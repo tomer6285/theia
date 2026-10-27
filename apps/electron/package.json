@@ -1,6 +1,9 @@
 {
   "name": "@dion/electron",
   "version": "0.1.0",
+  "description": "Dion Site and Webapp",
+  "homepage": "https://github.com/tomer6285/dion-tc",
+  "author": "Tomer Chalabi <tomerchalabi@gmail.com>",
   "private": true,
   "main": "./dist/main.js",
   "scripts": {
@@ -37,6 +40,7 @@
       "../web/dist/**/*"
     ],
     "linux": {
+      "maintainer": "Tomer Chalabi <tomerchalabi@gmail.com>",
       "target": [
         {
           "target": "AppImage",
@@ -54,6 +58,10 @@
         }
       ],
       "category": "Video"
+    },
+    "deb": {
+      "packageName": "dion-touch",
+      "artifactName": "dion-touch_${version}_${arch}.${ext}"
     },
     "mac": {
       "target": [
