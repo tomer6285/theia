@@ -1,7 +1,24 @@
 import { app, BrowserWindow, session } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
+
+function resolveWebIndexPath(): string {
+  const candidates = [
+    path.join(__dirname, '../../web/dist/index.html'),
+    path.join(__dirname, '../web/dist/index.html'),
+    path.join(app.getAppPath(), 'web/dist/index.html'),
+    path.join(app.getAppPath(), 'dist/index.html'),
+  ];
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+  return candidates[0];
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -44,8 +61,7 @@ function createWindow() {
     }
   );
 
-  // In production, load the built web app
-  const indexPath = path.join(__dirname, '../../web/dist/index.html');
+  const indexPath = resolveWebIndexPath();
   if (app.isPackaged || process.env.NODE_ENV === 'production') {
     mainWindow.loadFile(indexPath);
   } else {
