@@ -124,10 +124,14 @@ export class CinemetaClient {
   private formatMetaItem(meta: any, defaultType: MediaType): MediaItem {
     const rawType = meta.type === 'series' || meta.type === 'tv' ? 'series' : 'movie';
     const imdbId = meta.imdb_id || meta.id;
+    // Cinemeta uses moviedb_id for TMDb ID (fallback to tmdb_id if present)
+    const rawTmdb = meta.moviedb_id ?? meta.tmdb_id ?? meta.moviedbId ?? meta.tmdbId;
+    const tmdbId = rawTmdb ? String(rawTmdb) : undefined;
+
     return {
       id: imdbId,
       imdbId,
-      tmdbId: meta.tmdb_id ? String(meta.tmdb_id) : undefined,
+      tmdbId,
       type: defaultType || rawType,
       title: meta.name || meta.title || 'Untitled',
       year: meta.year ? String(meta.year) : meta.releaseInfo ? String(meta.releaseInfo) : undefined,

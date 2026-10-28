@@ -73,7 +73,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   preferredLanguages: ['en', 'es', 'fr', 'de'],
   preferredSubtitles: ['en'],
   serverPriority: ['vidlink', 'vixsrc', 'vidora'],
-  proxyUrl: '',
+  proxyUrl: '/api/proxy',
   autoPlayNext: true,
   autoResume: true,
   subtitleOffset: 0,

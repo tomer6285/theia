@@ -589,8 +589,115 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Main HUD Overlay Controls */}
-      {isHUDVisible && !isLocked && (
+      {/* Floating Top Bar for Embed Mode */}
+      {stream.format === 'embed' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            zIndex: 40,
+            pointerEvents: 'none',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 70%, transparent 100%)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'auto' }}>
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.65)',
+                  border: `1px solid ${colors.border.subtle}`,
+                  borderRadius: '50%',
+                  width: 40,
+                  height: 40,
+                  color: '#fff',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                ◀
+              </button>
+            )}
+            <div>
+              <h2 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: 700 }}>
+                {media.title}
+              </h2>
+              {episode && (
+                <span style={{ fontSize: '13px', color: colors.text.secondary }}>
+                  S{episode.season}:E{episode.episode} — {episode.title}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 56, pointerEvents: 'auto' }}>
+            {availableStreams.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setIsStreamSelectorOpen((prev) => !prev)}
+                style={{
+                  ...topIconButtonStyle,
+                  width: 'auto',
+                  padding: '0 14px',
+                  borderRadius: 14,
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  border: `1px solid ${colors.border.subtle}`,
+                }}
+              >
+                {stream.name} ▾
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Stream Selector Dropdown */}
+      {isStreamSelectorOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 70,
+            right: 80,
+            backgroundColor: colors.bg.surface,
+            border: `1px solid ${colors.border.subtle}`,
+            borderRadius: 14,
+            padding: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            zIndex: 50,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
+          }}
+        >
+          {availableStreams.map((s) => (
+            <TouchPill
+              key={s.id}
+              label={s.name}
+              active={s.id === stream.id}
+              size="sm"
+              onClick={() => {
+                onSelectStream?.(s);
+                setIsStreamSelectorOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Main HUD Overlay Controls (Native Video Mode) */}
+      {stream.format !== 'embed' && isHUDVisible && !isLocked && (
         <div
           style={{
             position: 'absolute',
@@ -686,39 +793,6 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               )}
             </div>
           </div>
-
-          {/* Stream Selector Dropdown */}
-          {isStreamSelectorOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 70,
-                right: 80,
-                backgroundColor: colors.bg.surface,
-                border: `1px solid ${colors.border.subtle}`,
-                borderRadius: 14,
-                padding: 10,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-                zIndex: 50,
-                boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
-              }}
-            >
-              {availableStreams.map((s) => (
-                <TouchPill
-                  key={s.id}
-                  label={s.name}
-                  active={s.id === stream.id}
-                  size="sm"
-                  onClick={() => {
-                    onSelectStream?.(s);
-                    setIsStreamSelectorOpen(false);
-                  }}
-                />
-              ))}
-            </div>
-          )}
 
           {/* Center Play/Pause Large Touch Button */}
           <div
