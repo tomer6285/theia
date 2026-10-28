@@ -8,6 +8,8 @@ export class VidoraProvider implements IProvider {
 
   async resolveStreams(query: ProviderQuery): Promise<StreamSource[]> {
     const streams: StreamSource[] = [];
+    if (query.signal?.aborted) return streams;
+
     const mediaId = query.imdbId || query.tmdbId;
     if (!mediaId) return streams;
 
@@ -18,6 +20,10 @@ export class VidoraProvider implements IProvider {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+      if (query.signal) {
+        query.signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
 
       const res = await fetch(embedUrl, {
         signal: controller.signal,
@@ -66,6 +72,8 @@ export class VidoraProvider implements IProvider {
     } catch {
       // Host unreachable or timed out; fail gracefully without hanging ProviderManager
     }
+
+    if (query.signal?.aborted) return [];
 
     return streams;
   }

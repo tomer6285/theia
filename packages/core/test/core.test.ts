@@ -12,7 +12,7 @@ import {
   parseSubtitles,
   offsetSubtitlesVTT,
 } from '../src/subtitles';
-import { theiaStore, theiaStore } from '../src/storage';
+import { theiaStore } from '../src/storage';
 
 describe('Crypto - VidLink XSalsa20-Poly1305', () => {
   it('should encrypt and decrypt mediaId token correctly', () => {
@@ -95,6 +95,57 @@ describe('Provider Manager', () => {
     expect(providers[0].id).toBe('vidlink');
     expect(providers[1].id).toBe('vixsrc');
     expect(providers[2].id).toBe('vidora');
+  });
+
+  it('should abort stream resolution immediately if signal is already aborted', async () => {
+    const manager = new ProviderManager({
+      providers: [new VidLinkProvider(), new VixSrcProvider(), new VidoraProvider()],
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const streams = await manager.resolveStreams({
+      imdbId: 'tt1375666',
+      type: 'movie',
+      title: 'Inception',
+      signal: controller.signal,
+    });
+
+    expect(streams).toEqual([]);
+  });
+
+  it('should cancel resolution when signal aborts during resolution', async () => {
+    const manager = new ProviderManager({
+      providers: [
+        {
+          name: 'SlowProvider',
+          id: 'slow',
+          priority: 50,
+          resolveStreams: async (q) => {
+            return new Promise((resolve, reject) => {
+              const timer = setTimeout(() => resolve([]), 5000);
+              q.signal?.addEventListener('abort', () => {
+                clearTimeout(timer);
+                reject(new DOMException('Aborted', 'AbortError'));
+              });
+            });
+          },
+        },
+      ],
+    });
+
+    const controller = new AbortController();
+    const resolvePromise = manager.resolveStreams({
+      imdbId: 'tt1375666',
+      type: 'movie',
+      title: 'Inception',
+      signal: controller.signal,
+    });
+
+    controller.abort();
+    const streams = await resolvePromise;
+    expect(streams).toEqual([]);
   });
 });
 

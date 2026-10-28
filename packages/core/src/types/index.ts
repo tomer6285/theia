@@ -68,6 +68,7 @@ export interface ProviderQuery {
   season?: number;
   episode?: number;
   title?: string;
+  signal?: AbortSignal;
 }
 
 export interface IProvider {

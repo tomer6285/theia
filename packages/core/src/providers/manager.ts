@@ -39,27 +39,55 @@ export class ProviderManager {
   /**
    * Resolves streams in parallel across all registered providers.
    * Tolerates single-provider failures and sorts results by priority and format.
+   * Can be aborted via query.signal.
    */
   async resolveStreams(query: ProviderQuery): Promise<StreamSource[]> {
+    if (query.signal?.aborted) {
+      return [];
+    }
+
     const activeProviders = this.getProviders();
     const results: StreamSource[] = [];
 
     const promises = activeProviders.map(async (provider) => {
       try {
+        if (query.signal?.aborted) return [];
+
         const streamPromise = provider.resolveStreams(query);
-        const timeoutPromise = new Promise<StreamSource[]>((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout resolving ${provider.name}`)), this.timeoutMs)
-        );
+        const timeoutPromise = new Promise<StreamSource[]>((_, reject) => {
+          const timer = setTimeout(
+            () => reject(new Error(`Timeout resolving ${provider.name}`)),
+            this.timeoutMs
+          );
+
+          if (query.signal) {
+            query.signal.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer);
+                reject(new DOMException('Aborted', 'AbortError'));
+              },
+              { once: true }
+            );
+          }
+        });
 
         const streams = await Promise.race([streamPromise, timeoutPromise]);
         return streams;
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || query.signal?.aborted) {
+          return [];
+        }
         console.warn(`Provider [${provider.name}] failed:`, err);
         return [];
       }
     });
 
     const streamArrays = await Promise.all(promises);
+    if (query.signal?.aborted) {
+      return [];
+    }
+
     for (const arr of streamArrays) {
       results.push(...arr);
     }

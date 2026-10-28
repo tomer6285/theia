@@ -9,6 +9,8 @@ export class VidLinkProvider implements IProvider {
 
   async resolveStreams(query: ProviderQuery): Promise<StreamSource[]> {
     const streams: StreamSource[] = [];
+    if (query.signal?.aborted) return streams;
+
     const isTv = query.type === 'series' && query.season !== undefined && query.episode !== undefined;
     // VidLink's TV routes strictly require numeric TMDb ID (IMDb tt... triggers Next.js server crash 4082599258)
     const tvMediaId = query.tmdbId || (query.imdbId && !query.imdbId.startsWith('tt') ? query.imdbId : undefined);
@@ -28,9 +30,14 @@ export class VidLinkProvider implements IProvider {
           : [`${this.baseUrl}/api/b/movie/${token}?multiLang=1`];
 
         for (const endpoint of endpoints) {
+          if (query.signal?.aborted) break;
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+            if (query.signal) {
+              query.signal.addEventListener('abort', () => controller.abort(), { once: true });
+            }
 
             const res = await fetch(endpoint, {
               signal: controller.signal,
@@ -116,10 +123,14 @@ export class VidLinkProvider implements IProvider {
             // Endpoint failure / timeout; try fallback endpoint
           }
         }
-      } catch (err) {
-        console.warn('VidLink stream resolution error:', err);
+      } catch (err: any) {
+        if (!query.signal?.aborted) {
+          console.warn('VidLink stream resolution error:', err);
+        }
       }
     }
+
+    if (query.signal?.aborted) return [];
 
     // Embed fallback / direct link
     // Only register VidLink TV embed if a numeric TMDb ID is known (prevents Next.js crash Digest 4082599258)

@@ -8,6 +8,8 @@ export class VixSrcProvider implements IProvider {
 
   async resolveStreams(query: ProviderQuery): Promise<StreamSource[]> {
     const streams: StreamSource[] = [];
+    if (query.signal?.aborted) return streams;
+
     const mediaId = query.imdbId || query.tmdbId;
     if (!mediaId) return streams;
 
@@ -22,13 +24,22 @@ export class VixSrcProvider implements IProvider {
       : `${this.baseUrl}/api/movie/${mediaId}`;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      if (query.signal) {
+        query.signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+
       const apiRes = await fetch(apiEndpoint, {
+        signal: controller.signal,
         headers: {
           'Referer': embedUrl,
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       });
+      clearTimeout(timeoutId);
 
       if (apiRes.ok) {
         const data = await apiRes.json();
@@ -53,9 +64,13 @@ export class VixSrcProvider implements IProvider {
           });
         }
       }
-    } catch (err) {
-      console.warn('VixSrc API error:', err);
+    } catch (err: any) {
+      if (!query.signal?.aborted) {
+        console.warn('VixSrc API error:', err);
+      }
     }
+
+    if (query.signal?.aborted) return [];
 
     // Always provide standard embed fallback
     streams.push({
