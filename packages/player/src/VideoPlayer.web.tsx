@@ -86,7 +86,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     if (Hls.isSupported() && (streamUrl.includes('.m3u8') || stream.format === 'hls')) {
       hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 60 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.1,
+        nudgeMaxRetry: 5,
       });
 
       hls.loadSource(streamUrl);
@@ -319,6 +327,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           style={{ width: '100%', height: '100%', border: 'none' }}
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
           allowFullScreen
+          referrerPolicy="origin"
         />
       ) : (
         <video

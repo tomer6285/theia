@@ -20,83 +20,100 @@ export class VidLinkProvider implements IProvider {
         const tokenTarget = isTv ? `${mediaId}/${query.season}/${query.episode}` : mediaId;
         const token = encryptVidlinkToken(tokenTarget);
 
-        const endpoint = isTv
-          ? `${this.baseUrl}/api/b/tv/${token}?multiLang=1`
-          : `${this.baseUrl}/api/b/movie/${token}?multiLang=1`;
+        const endpoints = isTv
+          ? [
+              `${this.baseUrl}/api/b/tv/${token}/${query.season}/${query.episode}?multiLang=1`,
+              `${this.baseUrl}/api/b/tv/${token}?multiLang=1`,
+            ]
+          : [`${this.baseUrl}/api/b/movie/${token}?multiLang=1`];
 
-        const res = await fetch(endpoint, {
-          headers: {
-            'Origin': this.baseUrl,
-            'Referer': `${this.baseUrl}/`,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-        });
+        for (const endpoint of endpoints) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-        if (res.ok) {
-          const data = await res.json();
-          const subtitles: SubtitleTrack[] = [];
-          if (Array.isArray(data.subtitles)) {
-            data.subtitles.forEach((sub: any, idx: number) => {
-              if (sub.url) {
-                subtitles.push({
-                  id: `vidlink-sub-${idx}`,
-                  language: sub.lang || sub.label || 'en',
-                  label: sub.label || sub.lang || `Track ${idx + 1}`,
-                  url: sub.url,
-                  format: sub.url.endsWith('.srt') ? 'srt' : 'vtt',
+            const res = await fetch(endpoint, {
+              signal: controller.signal,
+              headers: {
+                'Origin': this.baseUrl,
+                'Referer': `${this.baseUrl}/`,
+                'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              },
+            });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+              const data = await res.json();
+              const subtitles: SubtitleTrack[] = [];
+              if (Array.isArray(data.subtitles)) {
+                data.subtitles.forEach((sub: any, idx: number) => {
+                  if (sub.url) {
+                    subtitles.push({
+                      id: `vidlink-sub-${idx}`,
+                      language: sub.lang || sub.label || 'en',
+                      label: sub.label || sub.lang || `Track ${idx + 1}`,
+                      url: sub.url,
+                      format: sub.url.endsWith('.srt') ? 'srt' : 'vtt',
+                    });
+                  }
                 });
               }
-            });
-          }
 
-          // Direct m3u8 playlist if available
-          if (data.stream?.playlist || data.stream?.url || data.url) {
-            const streamUrl = data.stream?.playlist || data.stream?.url || data.url;
-            streams.push({
-              id: `vidlink-${query.imdbId || query.tmdbId}-hls`,
-              provider: 'vidlink',
-              name: 'VidLink (HLS)',
-              quality: data.stream?.quality || 'auto',
-              url: streamUrl,
-              format: 'hls',
-              headers: {
-                'Referer': `${this.baseUrl}/`,
-                'Origin': this.baseUrl,
-              },
-              subtitles,
-              requiresProxy: true,
-              priority: 100,
-            });
-          }
-
-          // Multiple qualities if provided (supports both array and object dictionary format)
-          if (data.stream?.qualities && typeof data.stream.qualities === 'object') {
-            const qualityList = Array.isArray(data.stream.qualities)
-              ? data.stream.qualities
-              : Object.entries(data.stream.qualities).map(([key, val]: any) => ({
-                  quality: key,
-                  ...val,
-                }));
-
-            qualityList.forEach((q: any) => {
-              if (q.url) {
+              // Direct m3u8 playlist if available
+              if (data.stream?.playlist || data.stream?.url || data.url) {
+                const streamUrl = data.stream?.playlist || data.stream?.url || data.url;
                 streams.push({
-                  id: `vidlink-${query.imdbId || query.tmdbId}-${q.quality || 'res'}`,
+                  id: `vidlink-${query.imdbId || query.tmdbId}-hls`,
                   provider: 'vidlink',
-                  name: `VidLink (${q.quality || 'Auto'})`,
-                  quality: q.quality || 'auto',
-                  url: q.url,
-                  format: q.url.includes('.m3u8') ? 'hls' : 'mp4',
+                  name: 'VidLink (HLS)',
+                  quality: data.stream?.quality || 'auto',
+                  url: streamUrl,
+                  format: 'hls',
                   headers: {
                     'Referer': `${this.baseUrl}/`,
                     'Origin': this.baseUrl,
                   },
                   subtitles,
                   requiresProxy: true,
-                  priority: 95,
+                  priority: 100,
                 });
               }
-            });
+
+              // Multiple qualities if provided
+              if (data.stream?.qualities && typeof data.stream.qualities === 'object') {
+                const qualityList = Array.isArray(data.stream.qualities)
+                  ? data.stream.qualities
+                  : Object.entries(data.stream.qualities).map(([key, val]: any) => ({
+                      quality: key,
+                      ...val,
+                    }));
+
+                qualityList.forEach((q: any) => {
+                  if (q.url) {
+                    streams.push({
+                      id: `vidlink-${query.imdbId || query.tmdbId}-${q.quality || 'res'}`,
+                      provider: 'vidlink',
+                      name: `VidLink (${q.quality || 'Auto'})`,
+                      quality: q.quality || 'auto',
+                      url: q.url,
+                      format: q.url.includes('.m3u8') ? 'hls' : 'mp4',
+                      headers: {
+                        'Referer': `${this.baseUrl}/`,
+                        'Origin': this.baseUrl,
+                      },
+                      subtitles,
+                      requiresProxy: true,
+                      priority: 95,
+                    });
+                  }
+                });
+              }
+
+              if (streams.length > 0) break;
+            }
+          } catch {
+            // Endpoint failure / timeout; try fallback endpoint
           }
         }
       } catch (err) {

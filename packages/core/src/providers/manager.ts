@@ -13,7 +13,7 @@ export class ProviderManager {
   private timeoutMs: number;
 
   constructor(options?: ProviderManagerOptions) {
-    this.timeoutMs = options?.timeoutMs || 8000;
+    this.timeoutMs = options?.timeoutMs || 5000;
 
     const defaultProviders = options?.providers || [
       new VidLinkProvider(),

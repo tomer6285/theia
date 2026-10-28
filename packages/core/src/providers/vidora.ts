@@ -16,12 +16,17 @@ export class VidoraProvider implements IProvider {
       : `${this.baseUrl}/movie/${mediaId}?autoplay=true`;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
       const res = await fetch(embedUrl, {
+        signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Referer': `${this.baseUrl}/`,
         },
       });
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         const html = await res.text();
@@ -46,21 +51,21 @@ export class VidoraProvider implements IProvider {
             });
           });
         }
-      }
-    } catch (err) {
-      console.warn('Vidora stream resolution error:', err);
-    }
 
-    streams.push({
-      id: `vidora-${query.imdbId}-embed`,
-      provider: 'vidora',
-      name: 'Vidora (Embed)',
-      quality: 'auto',
-      url: embedUrl,
-      format: 'embed',
-      requiresProxy: false,
-      priority: 70,
-    });
+        streams.push({
+          id: `vidora-${query.imdbId}-embed`,
+          provider: 'vidora',
+          name: 'Vidora (Embed)',
+          quality: 'auto',
+          url: embedUrl,
+          format: 'embed',
+          requiresProxy: false,
+          priority: 70,
+        });
+      }
+    } catch {
+      // Host unreachable or timed out; fail gracefully without hanging ProviderManager
+    }
 
     return streams;
   }

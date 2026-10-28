@@ -11,49 +11,53 @@ export class VixSrcProvider implements IProvider {
     const mediaId = query.imdbId || query.tmdbId;
     if (!mediaId) return streams;
 
-    const embedUrl = query.type === 'series' && query.season && query.episode
+    const isTv = query.type === 'series' && query.season !== undefined && query.episode !== undefined;
+    const embedUrl = isTv
       ? `${this.baseUrl}/tv/${mediaId}/${query.season}/${query.episode}`
       : `${this.baseUrl}/movie/${mediaId}`;
 
+    // Direct endpoint query for clean direct player embed
+    const apiEndpoint = isTv
+      ? `${this.baseUrl}/api/tv/${mediaId}/${query.season}/${query.episode}`
+      : `${this.baseUrl}/api/movie/${mediaId}`;
+
     try {
-      const res = await fetch(embedUrl, {
+      const apiRes = await fetch(apiEndpoint, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': `${this.baseUrl}/`,
+          'Referer': embedUrl,
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       });
 
-      if (res.ok) {
-        const html = await res.text();
-        // Match m3u8 playlists in the page source
-        const m3u8Regex = /https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/g;
-        const matches = html.match(m3u8Regex);
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        if (data?.src) {
+          const directEmbedUrl = data.src.startsWith('http')
+            ? data.src
+            : `${this.baseUrl}${data.src}`;
 
-        if (matches && matches.length > 0) {
-          const uniqueUrls = Array.from(new Set(matches));
-          uniqueUrls.forEach((url, idx) => {
-            streams.push({
-              id: `vixsrc-${query.imdbId}-stream-${idx}`,
-              provider: 'vixsrc',
-              name: `VixSrc Stream ${idx + 1}`,
-              quality: 'auto',
-              url,
-              format: 'hls',
-              headers: {
-                'Referer': `${this.baseUrl}/`,
-                'Origin': this.baseUrl,
-              },
-              requiresProxy: true,
-              priority: 90 - idx,
-            });
+          // Register direct player embed (bypasses Next.js wrappers directly to JWPlayer)
+          streams.push({
+            id: `vixsrc-${query.imdbId}-direct-embed`,
+            provider: 'vixsrc',
+            name: 'VixSrc (Player)',
+            quality: 'auto',
+            url: directEmbedUrl,
+            format: 'embed',
+            headers: {
+              'Referer': `${this.baseUrl}/`,
+            },
+            requiresProxy: false,
+            priority: 85,
           });
         }
       }
     } catch (err) {
-      console.warn('VixSrc scraping error:', err);
+      console.warn('VixSrc API error:', err);
     }
 
-    // Always provide embed stream
+    // Always provide standard embed fallback
     streams.push({
       id: `vixsrc-${query.imdbId}-embed`,
       provider: 'vixsrc',

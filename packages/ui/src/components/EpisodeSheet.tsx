@@ -22,7 +22,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
 }) => {
   const seasons: SeasonInfo[] = media.seasons || [];
   const [selectedSeason, setSelectedSeason] = useState<number>(
-    seasons[0]?.season || 1
+    seasons.find((s) => s.season === 1)?.season ?? seasons[0]?.season ?? 1
   );
   const activeEpisodeRef = useRef<HTMLDivElement>(null);
 
@@ -31,6 +31,14 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
       activeEpisodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [isOpen, selectedSeason]);
+
+  // Sync selectedSeason if media changes
+  useEffect(() => {
+    if (seasons.length > 0) {
+      const initialSeason = seasons.find((s) => s.season === 1)?.season ?? seasons[0]?.season ?? 1;
+      setSelectedSeason(initialSeason);
+    }
+  }, [media.id]);
 
   if (!isOpen) return null;
 
@@ -137,7 +145,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
             {seasons.map((s) => (
               <TouchPill
                 key={s.season}
-                label={`Season ${s.season}`}
+                label={s.season === 0 ? 'Specials' : `Season ${s.season}`}
                 active={s.season === selectedSeason}
                 onClick={() => setSelectedSeason(s.season)}
                 badge={s.episodes.length}

@@ -54,7 +54,7 @@ export class CinemetaClient {
         const episodes: Episode[] = data.meta.videos.map((v: any) => ({
           id: v.id || `${imdbId}:${v.season}:${v.episode || v.number}`,
           title: v.title || v.name || `Episode ${v.episode || v.number}`,
-          season: Number(v.season) || 1,
+          season: v.season !== undefined && v.season !== null ? Number(v.season) : 1,
           episode: Number(v.episode ?? v.number) || 1,
           overview: v.overview || v.description,
           thumbnail: v.thumbnail,
@@ -68,9 +68,7 @@ export class CinemetaClient {
           return a.episode - b.episode;
         });
 
-        item.episodes = episodes;
-
-        // Group into seasons
+        // Group into seasons (regular seasons 1+ first, season 0/specials placed at end)
         const seasonMap = new Map<number, Episode[]>();
         for (const ep of episodes) {
           const list = seasonMap.get(ep.season) || [];
@@ -78,17 +76,30 @@ export class CinemetaClient {
           seasonMap.set(ep.season, list);
         }
 
-        const seasons: SeasonInfo[] = [];
+        const regularSeasons: SeasonInfo[] = [];
+        let specialsSeason: SeasonInfo | null = null;
+
         Array.from(seasonMap.entries())
           .sort(([a], [b]) => a - b)
           .forEach(([seasonNum, eps]) => {
-            seasons.push({
-              season: seasonNum,
-              episodes: eps,
-            });
+            if (seasonNum === 0) {
+              specialsSeason = { season: 0, episodes: eps };
+            } else {
+              regularSeasons.push({ season: seasonNum, episodes: eps });
+            }
           });
 
+        const seasons: SeasonInfo[] = specialsSeason
+          ? [...regularSeasons, specialsSeason]
+          : regularSeasons;
+
         item.seasons = seasons;
+
+        // Order primary episodes list with regular seasons first (Season 1 Episode 1 as index 0)
+        item.episodes = [
+          ...regularSeasons.flatMap((s) => s.episodes),
+          ...(specialsSeason ? (specialsSeason as SeasonInfo).episodes : []),
+        ];
       }
 
       return item;
