@@ -47,7 +47,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease',
         transform: isPressed ? 'scale(0.95)' : 'scale(1)',
         WebkitTapHighlightColor: 'transparent',
-        touchAction: 'manipulation',
+        touchAction: 'pan-x pan-y',
       }}
     >
       {/* Poster Container */}
