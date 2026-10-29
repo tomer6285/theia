@@ -28,6 +28,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 
   // Gesture HUD states
   const [isLocked, setIsLocked] = useState(false);
+  const [showLockNotice, setShowLockNotice] = useState(false);
   const [isHUDVisible, setIsHUDVisible] = useState(true);
   const [brightness, setBrightness] = useState(100);
   const [volume, setVolume] = useState(100);
@@ -170,6 +171,16 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     return () => clearInterval(interval);
   }, [media.id, episode?.id, duration]);
 
+  const handleCycleAspect = () => {
+    setAspectRatio((current) => {
+      const next: AspectRatioMode =
+        current === 'fit' ? 'fill' : current === 'fill' ? '16:9' : 'fit';
+      setAspectToast(`Aspect Ratio: ${next.toUpperCase()}`);
+      setTimeout(() => setAspectToast(null), 1500);
+      return next;
+    });
+  };
+
   // Gesture Coordinator
   const coordinatorRef = useRef<GestureCoordinator | null>(null);
   useEffect(() => {
@@ -212,15 +223,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           setTimeout(() => setDoubleTapFeedback(null), 800);
         }
       },
-      onAspectCycle: () => {
-        setAspectRatio((current) => {
-          const next: AspectRatioMode =
-            current === 'fit' ? 'fill' : current === 'fill' ? '16:9' : 'fit';
-          setAspectToast(`Aspect Ratio: ${next.toUpperCase()}`);
-          setTimeout(() => setAspectToast(null), 1500);
-          return next;
-        });
-      },
+      onAspectCycle: handleCycleAspect,
     });
   }, [duration, isLocked]);
 
@@ -276,9 +279,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        touchAction: 'manipulation',
       }}
       onPointerDown={(e) => {
-        if (!isLocked && containerRef.current) {
+        if (isLocked) {
+          setShowLockNotice(true);
+          setTimeout(() => setShowLockNotice(false), 2200);
+          return;
+        }
+        if (containerRef.current) {
           coordinatorRef.current?.handlePointerDown(
             e,
             containerRef.current.getBoundingClientRect(),
@@ -367,10 +376,10 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         >
           <div
             style={{
-              width: 48,
-              height: 48,
+              width: 52,
+              height: 52,
               borderRadius: '50%',
-              border: `3px solid ${colors.border.subtle}`,
+              border: `3.5px solid ${colors.border.subtle}`,
               borderTopColor: colors.accent.primary,
               animation: 'spin 0.8s linear infinite',
             }}
@@ -383,32 +392,33 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            left: 40,
+            left: 32,
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 30,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: 16,
-            padding: '16px 14px',
+            backgroundColor: 'rgba(9, 9, 11, 0.85)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: 20,
+            padding: '18px 16px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 10,
-            border: `1px solid ${colors.border.subtle}`,
+            gap: 12,
+            border: `1.5px solid ${colors.border.subtle}`,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
           }}
         >
-          <span style={{ fontSize: '20px' }}>☀️</span>
-          <div style={{ height: 120, display: 'flex', alignItems: 'center' }}>
+          <span style={{ fontSize: '22px' }}>☀️</span>
+          <div style={{ height: 130, display: 'flex', alignItems: 'center' }}>
             <TouchSlider
               value={brightness}
               orientation="vertical"
-              height={120}
-              width={8}
+              height={130}
+              width={10}
               onChange={(val) => setBrightness(val)}
             />
           </div>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>
+          <span style={{ fontSize: '13px', fontWeight: 800, color: '#fff' }}>
             {brightness}%
           </span>
         </div>
@@ -419,28 +429,29 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            right: 40,
+            right: 32,
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 30,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: 16,
-            padding: '16px 14px',
+            backgroundColor: 'rgba(9, 9, 11, 0.85)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: 20,
+            padding: '18px 16px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 10,
-            border: `1px solid ${colors.border.subtle}`,
+            gap: 12,
+            border: `1.5px solid ${colors.border.subtle}`,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
           }}
         >
-          <span style={{ fontSize: '20px' }}>🔊</span>
-          <div style={{ height: 120, display: 'flex', alignItems: 'center' }}>
+          <span style={{ fontSize: '22px' }}>🔊</span>
+          <div style={{ height: 130, display: 'flex', alignItems: 'center' }}>
             <TouchSlider
               value={volume}
               orientation="vertical"
-              height={120}
-              width={8}
+              height={130}
+              width={10}
               fillColor={colors.accent.secondary}
               onChange={(val) => {
                 setVolume(val);
@@ -448,7 +459,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               }}
             />
           </div>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>
+          <span style={{ fontSize: '13px', fontWeight: 800, color: '#fff' }}>
             {volume}%
           </span>
         </div>
@@ -459,23 +470,24 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            top: '40%',
+            top: '38%',
             zIndex: 30,
-            backgroundColor: 'rgba(0,0,0,0.85)',
-            backdropFilter: 'blur(10px)',
-            padding: '12px 24px',
-            borderRadius: 20,
-            border: `1.5px solid ${colors.accent.primary}`,
+            backgroundColor: 'rgba(9, 9, 11, 0.9)',
+            backdropFilter: 'blur(14px)',
+            padding: '14px 28px',
+            borderRadius: 24,
+            border: `2px solid ${colors.accent.primary}`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 4,
+            gap: 6,
+            boxShadow: `0 0 25px ${colors.accent.primary}55`,
           }}
         >
-          <span style={{ fontSize: '20px', fontWeight: 700, color: colors.accent.primary }}>
+          <span style={{ fontSize: '24px', fontWeight: 800, color: colors.accent.primary }}>
             {scrubOffset > 0 ? `+${scrubOffset}s` : `${scrubOffset}s`}
           </span>
-          <span style={{ fontSize: '13px', color: colors.text.secondary }}>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: colors.text.secondary }}>
             {formatTime(Math.max(0, Math.min(duration, currentTime + scrubOffset)))} / {formatTime(duration)}
           </span>
         </div>
@@ -486,22 +498,23 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            [doubleTapFeedback === 'backward' ? 'left' : 'right']: '15%',
+            [doubleTapFeedback === 'backward' ? 'left' : 'right']: '14%',
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 30,
             backgroundColor: 'rgba(6, 182, 212, 0.25)',
-            backdropFilter: 'blur(6px)',
+            backdropFilter: 'blur(8px)',
             borderRadius: '50%',
-            width: 90,
-            height: 90,
+            width: 100,
+            height: 100,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '18px',
-            fontWeight: 700,
+            fontWeight: 800,
             color: '#fff',
-            border: `2px solid ${colors.accent.primary}`,
+            border: `2.5px solid ${colors.accent.primary}`,
+            boxShadow: `0 0 20px ${colors.accent.primary}66`,
           }}
         >
           {doubleTapFeedback === 'backward' ? '◀◀ 10s' : '10s ▶▶'}
@@ -513,18 +526,66 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            top: 60,
+            top: 70,
             zIndex: 30,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            padding: '8px 18px',
-            borderRadius: 16,
-            fontSize: '13px',
-            fontWeight: 600,
+            backgroundColor: 'rgba(9, 9, 11, 0.9)',
+            backdropFilter: 'blur(10px)',
+            padding: '10px 22px',
+            borderRadius: 20,
+            fontSize: '14px',
+            fontWeight: 700,
             color: colors.text.primary,
-            border: `1px solid ${colors.border.subtle}`,
+            border: `1.5px solid ${colors.border.subtle}`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
           }}
         >
           {aspectToast}
+        </div>
+      )}
+
+      {/* Screen Lock Notice Overlay (When locked and user touches) */}
+      {isLocked && showLockNotice && (
+        <div
+          style={{
+            position: 'absolute',
+            zIndex: 45,
+            backgroundColor: 'rgba(9, 9, 11, 0.92)',
+            backdropFilter: 'blur(16px)',
+            border: `1.5px solid ${colors.status.danger}`,
+            borderRadius: 24,
+            padding: '18px 26px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 12,
+            boxShadow: '0 12px 40px rgba(0,0,0,0.85)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontSize: '28px' }}>🔒</div>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>
+            Touch Controls Locked
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsLocked(false);
+              setShowLockNotice(false);
+            }}
+            style={{
+              padding: '10px 22px',
+              borderRadius: 14,
+              backgroundColor: colors.accent.primary,
+              border: 'none',
+              color: '#000',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            Tap to Unlock 🔓
+          </button>
         </div>
       )}
 
@@ -537,18 +598,21 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           top: 24,
           right: 24,
           zIndex: 40,
-          backgroundColor: isLocked ? colors.status.danger : 'rgba(0,0,0,0.6)',
-          border: `1px solid ${colors.border.subtle}`,
+          backgroundColor: isLocked ? colors.status.danger : 'rgba(9, 9, 11, 0.75)',
+          border: `1.5px solid ${isLocked ? colors.status.danger : colors.border.subtle}`,
           borderRadius: '50%',
-          width: 44,
-          height: 44,
+          width: 48,
+          height: 48,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           color: '#fff',
-          fontSize: '18px',
+          fontSize: '20px',
+          touchAction: 'manipulation',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
         }}
+        aria-label={isLocked ? 'Unlock controls' : 'Lock controls'}
       >
         {isLocked ? '🔒' : '🔓'}
       </button>
@@ -558,25 +622,25 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            bottom: 100,
+            bottom: 110,
             right: 24,
             zIndex: 35,
             backgroundColor: 'rgba(9, 9, 11, 0.95)',
-            backdropFilter: 'blur(10px)',
+            backdropFilter: 'blur(14px)',
             border: `1.5px solid ${colors.accent.primary}`,
-            borderRadius: 16,
-            padding: '14px 20px',
+            borderRadius: 20,
+            padding: '16px 22px',
             display: 'flex',
             alignItems: 'center',
             gap: 16,
-            boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+            boxShadow: `0 8px 32px rgba(0,0,0,0.7), 0 0 20px ${colors.accent.primary}33`,
           }}
         >
           <div>
-            <div style={{ fontSize: '11px', color: colors.accent.primary, fontWeight: 700 }}>
+            <div style={{ fontSize: '11px', color: colors.accent.primary, fontWeight: 800, letterSpacing: '0.5px' }}>
               UP NEXT
             </div>
-            <div style={{ fontSize: '14px', color: '#fff', fontWeight: 600 }}>
+            <div style={{ fontSize: '15px', color: '#fff', fontWeight: 700, marginTop: 2 }}>
               Next Episode Playing Soon
             </div>
           </div>
@@ -584,13 +648,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             type="button"
             onClick={onNextEpisode}
             style={{
-              padding: '8px 16px',
-              borderRadius: 10,
+              padding: '10px 18px',
+              borderRadius: 12,
               backgroundColor: colors.accent.primary,
               border: 'none',
               color: '#000',
-              fontWeight: 700,
+              fontWeight: 800,
+              fontSize: '14px',
               cursor: 'pointer',
+              touchAction: 'manipulation',
             }}
           >
             Play Now ▶
@@ -606,13 +672,13 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             top: 0,
             left: 0,
             right: 0,
-            padding: '16px 24px',
+            padding: '20px 24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             zIndex: 40,
             pointerEvents: 'none',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 70%, transparent 100%)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'auto' }}>
@@ -621,24 +687,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
                 type="button"
                 onClick={onBack}
                 style={{
-                  backgroundColor: 'rgba(0,0,0,0.65)',
-                  border: `1px solid ${colors.border.subtle}`,
-                  borderRadius: '50%',
-                  width: 40,
-                  height: 40,
-                  color: '#fff',
-                  fontSize: '18px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  ...topIconButtonStyle,
+                  backgroundColor: 'rgba(9, 9, 11, 0.75)',
                 }}
               >
                 ◀
               </button>
             )}
             <div>
-              <h2 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: 700 }}>
+              <h2 style={{ margin: 0, fontSize: '17px', color: '#fff', fontWeight: 800 }}>
                 {media.title}
               </h2>
               {episode && (
@@ -649,7 +706,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 56, pointerEvents: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 58, pointerEvents: 'auto' }}>
             {availableStreams.length > 1 && (
               <button
                 type="button"
@@ -657,11 +714,11 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
                 style={{
                   ...topIconButtonStyle,
                   width: 'auto',
-                  padding: '0 14px',
-                  borderRadius: 14,
-                  fontSize: '12px',
+                  padding: '0 16px',
+                  borderRadius: 16,
+                  fontSize: '13px',
                   fontWeight: 700,
-                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  backgroundColor: 'rgba(9, 9, 11, 0.8)',
                   border: `1px solid ${colors.border.subtle}`,
                 }}
               >
@@ -677,17 +734,17 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            top: 70,
+            top: 76,
             right: 80,
             backgroundColor: colors.bg.surface,
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: 14,
-            padding: 10,
+            border: `1.5px solid ${colors.border.subtle}`,
+            borderRadius: 18,
+            padding: 12,
             display: 'flex',
             flexDirection: 'column',
-            gap: 6,
+            gap: 8,
             zIndex: 50,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.85)',
           }}
         >
           {availableStreams.map((s) => (
@@ -712,11 +769,11 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             position: 'absolute',
             inset: 0,
             zIndex: 20,
-            backgroundColor: 'rgba(0,0,0,0.45)',
+            backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            padding: '20px 24px',
+            padding: '24px 28px',
             transition: 'opacity 0.25s ease',
           }}
           onClick={(e) => {
@@ -732,25 +789,14 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
                 <button
                   type="button"
                   onClick={onBack}
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: 40,
-                    height: 40,
-                    color: '#fff',
-                    fontSize: '18px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  style={topIconButtonStyle}
+                  aria-label="Back"
                 >
                   ◀
                 </button>
               )}
               <div>
-                <h2 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: 700 }}>
+                <h2 style={{ margin: 0, fontSize: '18px', color: '#fff', fontWeight: 800 }}>
                   {media.title}
                 </h2>
                 {episode && (
@@ -762,11 +808,11 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             </div>
 
             {/* Quick action buttons in top bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 56 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 58 }}>
               {/* Aspect Ratio Button */}
               <button
                 type="button"
-                onClick={() => coordinatorRef.current?.handlePointerUp}
+                onClick={handleCycleAspect}
                 style={topIconButtonStyle}
                 title="Aspect Ratio"
               >
@@ -791,9 +837,9 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
                   style={{
                     ...topIconButtonStyle,
                     width: 'auto',
-                    padding: '0 12px',
-                    borderRadius: 14,
-                    fontSize: '12px',
+                    padding: '0 14px',
+                    borderRadius: 16,
+                    fontSize: '13px',
                     fontWeight: 700,
                   }}
                 >
@@ -803,13 +849,13 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
 
-          {/* Center Play/Pause Large Touch Button */}
+          {/* Center Play/Pause Large Touch Buttons */}
           <div
             style={{
               alignSelf: 'center',
               display: 'flex',
               alignItems: 'center',
-              gap: 28,
+              gap: 36,
             }}
           >
             <button
@@ -820,6 +866,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
                 }
               }}
               style={centerCircleButtonStyle}
+              aria-label="Seek back 10 seconds"
             >
               -10s
             </button>
@@ -828,12 +875,14 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               onClick={handleTogglePlay}
               style={{
                 ...centerCircleButtonStyle,
-                width: 68,
-                height: 68,
-                fontSize: '28px',
+                width: 78,
+                height: 78,
+                fontSize: '32px',
                 backgroundColor: colors.accent.primary,
                 color: '#000',
+                boxShadow: `0 0 24px ${colors.accent.primary}66`,
               }}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? '⏸' : '▶'}
             </button>
@@ -845,17 +894,19 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
                 }
               }}
               style={centerCircleButtonStyle}
+              aria-label="Seek forward 10 seconds"
             >
               +10s
             </button>
           </div>
 
           {/* Bottom Bar: Progress scrubber & time */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <TouchSlider
               value={currentTime}
               min={0}
               max={duration || 100}
+              formatTooltip={(val) => formatTime(val)}
               onChange={(val) => {
                 if (videoRef.current) {
                   videoRef.current.currentTime = val;
@@ -864,7 +915,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: '#fff', fontWeight: 600 }}>
+              <span style={{ fontSize: '14px', color: '#fff', fontWeight: 700 }}>
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -876,9 +927,10 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
                       background: 'none',
                       border: 'none',
                       color: colors.accent.primary,
-                      fontWeight: 700,
+                      fontWeight: 800,
                       cursor: 'pointer',
-                      fontSize: '13px',
+                      fontSize: '14px',
+                      touchAction: 'manipulation',
                     }}
                   >
                     Next Episode ▶|
@@ -908,30 +960,36 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 };
 
 const topIconButtonStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(255,255,255,0.12)',
+  backgroundColor: 'rgba(255,255,255,0.15)',
   border: 'none',
   borderRadius: '50%',
-  width: 40,
-  height: 40,
+  width: 44,
+  height: 44,
   color: '#fff',
-  fontSize: '16px',
+  fontSize: '18px',
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  touchAction: 'manipulation',
+  WebkitTapHighlightColor: 'transparent',
+  transition: 'transform 0.15s ease',
 };
 
 const centerCircleButtonStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  border: `1px solid ${colors.border.subtle}`,
+  backgroundColor: 'rgba(9, 9, 11, 0.75)',
+  border: `1.5px solid ${colors.border.subtle}`,
   borderRadius: '50%',
-  width: 52,
-  height: 52,
+  width: 60,
+  height: 60,
   color: '#fff',
-  fontSize: '14px',
-  fontWeight: 700,
+  fontSize: '15px',
+  fontWeight: 800,
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  touchAction: 'manipulation',
+  WebkitTapHighlightColor: 'transparent',
+  transition: 'transform 0.15s ease',
 };

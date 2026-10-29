@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MediaItem, WatchProgress } from '@theia/core';
 import { colors } from '../theme/colors';
 
@@ -7,6 +7,7 @@ export interface MediaCardProps {
   progress?: WatchProgress;
   onPress: (media: MediaItem) => void;
   onToggleFavorite?: (media: MediaItem) => void;
+  onQuickPlay?: (media: MediaItem) => void;
   isFavorite?: boolean;
   width?: number | string;
 }
@@ -16,15 +17,19 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   progress,
   onPress,
   onToggleFavorite,
+  onQuickPlay,
   isFavorite = false,
   width = 170,
 }) => {
-  const [isPressed, setIsPressed] = React.useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+  const [isFavPressed, setIsFavPressed] = useState(false);
 
   const posterUrl =
     media.poster ||
     media.background ||
     'https://via.placeholder.com/300x450/1c1c22/71717a?text=No+Poster';
+
+  const hasProgress = progress && progress.percentage > 2 && !progress.completed;
 
   return (
     <div
@@ -32,15 +37,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       onPointerDown={() => setIsPressed(true)}
       onPointerUp={() => setIsPressed(false)}
       onPointerLeave={() => setIsPressed(false)}
+      onPointerCancel={() => setIsPressed(false)}
       style={{
         width,
         display: 'flex',
         flexDirection: 'column',
         cursor: 'pointer',
         userSelect: 'none',
-        transition: 'transform 0.15s ease, opacity 0.15s ease',
-        transform: isPressed ? 'scale(0.96)' : 'scale(1)',
+        transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease',
+        transform: isPressed ? 'scale(0.95)' : 'scale(1)',
         WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
       }}
     >
       {/* Poster Container */}
@@ -49,11 +56,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           position: 'relative',
           width: '100%',
           aspectRatio: '2 / 3',
-          borderRadius: 12,
+          borderRadius: 16,
           overflow: 'hidden',
           backgroundColor: colors.bg.elevated,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-          border: `1px solid ${colors.border.subtle}`,
+          boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+          border: `1.5px solid ${colors.border.subtle}`,
         }}
       >
         <img
@@ -75,23 +82,24 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               position: 'absolute',
               top: 8,
               left: 8,
-              backgroundColor: 'rgba(0,0,0,0.75)',
-              backdropFilter: 'blur(4px)',
-              padding: '3px 7px',
-              borderRadius: 6,
+              backgroundColor: 'rgba(9, 9, 11, 0.85)',
+              backdropFilter: 'blur(8px)',
+              padding: '3px 8px',
+              borderRadius: 8,
               fontSize: '11px',
-              fontWeight: 700,
+              fontWeight: 800,
               color: '#facc15', // Gold
               display: 'flex',
               alignItems: 'center',
               gap: 3,
+              border: '1px solid rgba(250, 204, 21, 0.3)',
             }}
           >
             ★ {media.rating}
           </div>
         )}
 
-        {/* Favorite Button */}
+        {/* Touch Favorite Button (Generous touch target) */}
         {onToggleFavorite && (
           <button
             type="button"
@@ -99,25 +107,72 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               e.stopPropagation();
               onToggleFavorite(media);
             }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setIsFavPressed(true);
+            }}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+              setIsFavPressed(false);
+            }}
+            onPointerLeave={() => setIsFavPressed(false)}
             style={{
               position: 'absolute',
-              top: 8,
-              right: 8,
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: 'rgba(0,0,0,0.65)',
-              backdropFilter: 'blur(4px)',
-              border: 'none',
+              top: 6,
+              right: 6,
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: 'rgba(9, 9, 11, 0.75)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.1)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: isFavorite ? '#ef4444' : colors.text.muted,
-              fontSize: '16px',
+              color: isFavorite ? '#ef4444' : colors.text.primary,
+              fontSize: '18px',
+              transition: 'transform 0.15s ease',
+              transform: isFavPressed ? 'scale(0.85)' : 'scale(1)',
+              touchAction: 'manipulation',
             }}
+            aria-label="Toggle favorite"
           >
             {isFavorite ? '♥' : '♡'}
+          </button>
+        )}
+
+        {/* Quick Resume Touch Play Icon */}
+        {hasProgress && onQuickPlay && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onQuickPlay(media);
+            }}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 46,
+              height: 46,
+              borderRadius: 23,
+              backgroundColor: 'rgba(6, 182, 212, 0.9)',
+              border: '2px solid #ffffff',
+              color: '#000000',
+              fontSize: '18px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 0 20px ${colors.accent.primary}`,
+              paddingLeft: 3, // visual centering for triangle
+              touchAction: 'manipulation',
+            }}
+            aria-label="Resume video"
+          >
+            ▶
           </button>
         )}
 
@@ -125,31 +180,33 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         <div
           style={{
             position: 'absolute',
-            bottom: progress ? 8 : 8,
+            bottom: hasProgress ? 12 : 8,
             right: 8,
-            backgroundColor: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(4px)',
-            padding: '2px 6px',
-            borderRadius: 4,
+            backgroundColor: 'rgba(9, 9, 11, 0.85)',
+            backdropFilter: 'blur(6px)',
+            padding: '3px 7px',
+            borderRadius: 6,
             fontSize: '10px',
-            fontWeight: 600,
-            color: colors.text.secondary,
+            fontWeight: 700,
+            color: colors.accent.primary,
             textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            border: `1px solid ${colors.border.subtle}`,
           }}
         >
           {media.type}
         </div>
 
         {/* Progress Bar (if in watch progress) */}
-        {progress && (
+        {hasProgress && (
           <div
             style={{
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              height: 4,
-              backgroundColor: 'rgba(255,255,255,0.2)',
+              height: 5,
+              backgroundColor: 'rgba(0,0,0,0.6)',
             }}
           >
             <div
@@ -157,7 +214,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                 height: '100%',
                 width: `${Math.min(100, Math.max(0, progress.percentage))}%`,
                 backgroundColor: colors.accent.primary,
-                boxShadow: `0 0 8px ${colors.accent.primary}`,
+                boxShadow: `0 0 10px ${colors.accent.primary}`,
               }}
             />
           </div>
@@ -165,11 +222,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       </div>
 
       {/* Title & Metadata */}
-      <div style={{ marginTop: 8, padding: '0 2px' }}>
+      <div style={{ marginTop: 10, padding: '0 2px' }}>
         <div
           style={{
             fontSize: '14px',
-            fontWeight: 600,
+            fontWeight: 700,
             color: colors.text.primary,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -183,7 +240,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           style={{
             fontSize: '12px',
             color: colors.text.muted,
-            marginTop: 2,
+            marginTop: 3,
             display: 'flex',
             alignItems: 'center',
             gap: 6,
