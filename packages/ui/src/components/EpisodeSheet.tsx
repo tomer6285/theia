@@ -91,7 +91,6 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
         flexDirection: 'column',
         justifyContent: 'flex-end',
         animation: 'fadeIn 0.2s ease-out',
-        touchAction: 'manipulation',
       }}
       onClick={onClose}
     >
@@ -118,64 +117,55 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
           onPointerUp={handlePointerUpHeader}
           onPointerCancel={handlePointerUpHeader}
           style={{
+            height: 32,
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            padding: '14px 20px 8px 20px',
+            justifyContent: 'center',
             cursor: 'grab',
             touchAction: 'none',
-            userSelect: 'none',
           }}
         >
-          {/* Pill indicator */}
           <div
             style={{
-              width: 50,
+              width: 44,
               height: 5,
               borderRadius: 3,
-              backgroundColor: isDragging ? colors.accent.primary : colors.border.default,
+              backgroundColor: isDragging ? colors.accent.primary : 'rgba(255,255,255,0.3)',
               transition: 'background-color 0.2s ease',
             }}
           />
         </div>
 
-        {/* Header */}
+        {/* Title Bar */}
         <div
-          onPointerDown={handlePointerDownHeader}
-          onPointerMove={handlePointerMoveHeader}
-          onPointerUp={handlePointerUpHeader}
-          onPointerCancel={handlePointerUpHeader}
           style={{
-            padding: '4px 24px 14px 24px',
+            padding: '4px 20px 14px 20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             borderBottom: `1px solid ${colors.border.subtle}`,
-            touchAction: 'none',
-            userSelect: 'none',
           }}
         >
           <div>
-            <h3 style={{ margin: 0, fontSize: '20px', color: colors.text.primary, fontWeight: 800 }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#fff' }}>
+              Select Episode
+            </h2>
+            <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: colors.text.muted }}>
               {media.title}
-            </h3>
-            <span style={{ fontSize: '13px', color: colors.text.muted, marginTop: 2, display: 'block' }}>
-              Select Episode & Season
-            </span>
+            </p>
           </div>
-
           <button
             type="button"
             onClick={onClose}
             style={{
-              background: colors.bg.elevated,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: colors.bg.elevated,
               border: `1px solid ${colors.border.subtle}`,
-              color: colors.text.secondary,
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              cursor: 'pointer',
+              color: colors.text.muted,
               fontSize: '18px',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -190,6 +180,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
         {/* Season Selector Horizontal Scroll Tabs */}
         {seasons.length > 1 && (
           <div
+            className="touch-scroll-row"
             style={{
               display: 'flex',
               gap: 10,
@@ -199,6 +190,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
               scrollbarWidth: 'none',
               scrollSnapType: 'x proximity',
               WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-x pan-y',
             }}
           >
             {seasons.map((s) => (
@@ -225,6 +217,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
             flexDirection: 'column',
             gap: 12,
             WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
           }}
         >
           {episodes.map((ep) => {
