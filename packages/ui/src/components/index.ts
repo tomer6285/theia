@@ -2,6 +2,8 @@ export * from './TouchPill';
 export * from './TouchSlider';
 export * from './TouchSwitch';
 export * from './MediaCard';
+export * from './EpisodeCard';
+export * from './SeasonSelector';
 export * from './EpisodeSheet';
 export * from './SearchBar';
 export * from './SubtitleStepper';
