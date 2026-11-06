@@ -13,6 +13,7 @@ export interface TouchSliderProps {
   trackColor?: string;
   fillColor?: string;
   showThumb?: boolean;
+  label?: string;
   formatTooltip?: (value: number) => string;
 }
 
@@ -29,6 +30,7 @@ export const TouchSlider: React.FC<TouchSliderProps> = ({
   fillColor = colors.accent.primary,
   showThumb = true,
   formatTooltip,
+  label = 'Adjust value',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -48,15 +50,18 @@ export const TouchSlider: React.FC<TouchSliderProps> = ({
     }
 
     const raw = min + percentage * (max - min);
-    const stepped = Math.round(raw / step) * step;
+    const stepped = min + Math.round((raw - min) / (step > 0 ? step : 1)) * (step > 0 ? step : 1);
     onChange(Math.max(min, Math.min(max, stepped)));
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !e.isPrimary) return;
     e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.focus();
     setIsDragging(true);
     try {
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
       // ignore in environments without capture support
     }
@@ -69,19 +74,41 @@ export const TouchSlider: React.FC<TouchSliderProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
     setIsDragging(false);
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
-  const percentage = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  const percentage = Math.max(0, Math.min(100, ((value - min) / (max - min || 1)) * 100));
 
   // Generous touch hit zone (at least 44px touch area)
   const isHoriz = orientation === 'horizontal';
 
   return (
     <div
+      role="slider"
+      tabIndex={0}
+      aria-label={label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.max(min, Math.min(max, value))}
+      aria-valuetext={formatTooltip?.(value)}
+      aria-orientation={orientation}
+      onKeyDown={(event) => {
+        const delta = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? step
+          : event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -step
+          : event.key === 'PageUp' ? step * 10 : event.key === 'PageDown' ? -step * 10 : null;
+        if (delta !== null || event.key === 'Home' || event.key === 'End') {
+          event.preventDefault();
+          event.stopPropagation();
+          onChange(event.key === 'Home' ? min : event.key === 'End' ? max : Math.max(min, Math.min(max, value + (delta || 0))));
+        }
+      }}
       style={{
         position: 'relative',
-        width,
+        width: isHoriz ? width : undefined,
+        minWidth: isHoriz ? undefined : 44,
+        minHeight: isHoriz ? 44 : undefined,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -100,7 +127,7 @@ export const TouchSlider: React.FC<TouchSliderProps> = ({
         ref={containerRef}
         style={{
           position: 'relative',
-          width: '100%',
+          width: isHoriz ? '100%' : width,
           height,
           backgroundColor: trackColor,
           borderRadius: 9999,

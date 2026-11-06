@@ -1,3 +1,4 @@
+import { fetchProviderResponse } from '../network/request';
 import { IProvider, ProviderQuery, StreamSource, SubtitleTrack } from '../types';
 import { encryptVidlinkToken } from '../crypto/vidlink';
 
@@ -9,6 +10,7 @@ export class VidLinkProvider implements IProvider {
 
   async resolveStreams(query: ProviderQuery): Promise<StreamSource[]> {
     const streams: StreamSource[] = [];
+    if (query.type === 'series' && (query.season === undefined || query.episode === undefined)) return streams;
     if (query.signal?.aborted) return streams;
 
     const isTv = query.type === 'series' && query.season !== undefined && query.episode !== undefined;
@@ -32,23 +34,14 @@ export class VidLinkProvider implements IProvider {
         for (const endpoint of endpoints) {
           if (query.signal?.aborted) break;
           try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-            if (query.signal) {
-              query.signal.addEventListener('abort', () => controller.abort(), { once: true });
-            }
-
-            const res = await fetch(endpoint, {
-              signal: controller.signal,
+            const res = await fetchProviderResponse(endpoint, {
               headers: {
                 'Origin': this.baseUrl,
                 'Referer': `${this.baseUrl}/`,
                 'User-Agent':
                   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               },
-            });
-            clearTimeout(timeoutId);
+            }, query.signal);
 
             if (res.ok) {
               const data = await res.json();
@@ -105,7 +98,7 @@ export class VidLinkProvider implements IProvider {
                       quality: q.quality || 'auto',
                       url: q.url,
                       format: q.url.includes('.m3u8') ? 'hls' : 'mp4',
-                      headers: {
+                headers: {
                         'Referer': `${this.baseUrl}/`,
                         'Origin': this.baseUrl,
                       },

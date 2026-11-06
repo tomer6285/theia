@@ -1,160 +1,91 @@
-import { AspectRatioMode } from '../types';
+import type { PointerEvent } from 'react';
 
-export interface GesturePointerCoords {
-  x: number;
-  y: number;
-  time: number;
-}
-
+export interface GesturePointerCoords { x: number; y: number; time: number }
 export type DragMode = 'none' | 'left-brightness' | 'right-volume' | 'center-scrub';
 
 export class GestureCoordinator {
   private startPoint: GesturePointerCoords | null = null;
-  private currentPoint: GesturePointerCoords | null = null;
   private dragMode: DragMode = 'none';
+  private startBrightness = 100;
+  private startVolume = 100;
+  private scrubOffset: number | null = null;
   private lastTapTime = 0;
   private lastTapX = 0;
-  private hudHideTimer: any = null;
+  private tapTimer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(
-    private options: {
-      onToggleHUD: () => void;
-      onSeekDelta: (deltaSeconds: number) => void;
-      onBrightnessChange: (brightness: number) => void;
-      onVolumeChange: (volume: number) => void;
-      onScrubUpdate: (offsetSeconds: number | null) => void;
-      onDoubleTapSeek: (direction: 'forward' | 'backward') => void;
-      onAspectCycle: () => void;
-    }
-  ) {}
+  constructor(private options: {
+    onToggleHUD: () => void;
+    onSeekDelta: (deltaSeconds: number) => void;
+    onBrightnessChange: (brightness: number) => void;
+    onVolumeChange: (volume: number) => void;
+    onScrubUpdate: (offsetSeconds: number | null) => void;
+    onDoubleTapSeek: (direction: 'forward' | 'backward') => void;
+    onAspectCycle: () => void;
+  }) {}
 
-  resetHUDTimer(delayMs = 4000) {
-    if (this.hudHideTimer) {
-      clearTimeout(this.hudHideTimer);
-    }
-    this.hudHideTimer = setTimeout(() => {
-      this.options.onToggleHUD();
-    }, delayMs);
+  dispose() {
+    clearTimeout(this.tapTimer);
+    this.cancel();
   }
 
-  clearHUDTimer() {
-    if (this.hudHideTimer) {
-      clearTimeout(this.hudHideTimer);
-      this.hudHideTimer = null;
+  cancel() {
+    this.startPoint = null;
+    this.dragMode = 'none';
+    this.scrubOffset = null;
+    this.options.onScrubUpdate(null);
+  }
+
+  handlePointerDown(e: PointerEvent<HTMLDivElement>, bounds: DOMRect, brightness: number, volume: number) {
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const x = e.clientX - bounds.left;
+    this.startPoint = { x, y: e.clientY - bounds.top, time: Date.now() };
+    this.startBrightness = brightness;
+    this.startVolume = volume;
+    this.scrubOffset = null;
+    this.dragMode = x / bounds.width < 0.35 ? 'left-brightness'
+      : x / bounds.width > 0.65 ? 'right-volume' : 'center-scrub';
+  }
+
+  handlePointerMove(e: PointerEvent<HTMLDivElement>, bounds: DOMRect, _brightness: number, _volume: number, duration: number) {
+    if (!this.startPoint || bounds.height <= 0 || bounds.width <= 0) return;
+    const dx = e.clientX - bounds.left - this.startPoint.x;
+    const dy = e.clientY - bounds.top - this.startPoint.y;
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    if (this.dragMode === 'center-scrub' && duration > 0 && Math.abs(dx) > Math.abs(dy)) {
+      this.scrubOffset = Math.round(dx / bounds.width * 90);
+      this.options.onScrubUpdate(this.scrubOffset);
+    } else if (Math.abs(dy) > Math.abs(dx)) {
+      const start = this.dragMode === 'left-brightness' ? this.startBrightness : this.startVolume;
+      const value = Math.max(0, Math.min(100, Math.round(start - dy / bounds.height * 100)));
+      if (this.dragMode === 'left-brightness') this.options.onBrightnessChange(value);
+      if (this.dragMode === 'right-volume') this.options.onVolumeChange(value);
     }
   }
 
-  handlePointerDown(
-    e: React.PointerEvent<HTMLDivElement>,
-    bounds: DOMRect,
-    currentBrightness: number,
-    currentVolume: number
-  ) {
+  handlePointerUp(e: PointerEvent<HTMLDivElement>, bounds: DOMRect, _offset?: number | null) {
+    if (!this.startPoint) return;
     const x = e.clientX - bounds.left;
     const y = e.clientY - bounds.top;
     const now = Date.now();
-
-    this.startPoint = { x, y, time: now };
-    this.currentPoint = { x, y, time: now };
-
-    // Determine initial drag mode based on horizontal zones
-    const xRatio = x / bounds.width;
-    if (xRatio < 0.35) {
-      this.dragMode = 'left-brightness';
-    } else if (xRatio > 0.65) {
-      this.dragMode = 'right-volume';
-    } else {
-      this.dragMode = 'center-scrub';
-    }
-  }
-
-  handlePointerMove(
-    e: React.PointerEvent<HTMLDivElement>,
-    bounds: DOMRect,
-    startBrightness: number,
-    startVolume: number,
-    duration: number
-  ) {
-    if (!this.startPoint) return;
-    const x = e.clientX - bounds.left;
-    const y = e.clientY - bounds.top;
-    const deltaX = x - this.startPoint.x;
-    const deltaY = y - this.startPoint.y;
-
-    // Must exceed movement threshold to be recognized as drag
-    if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) return;
-
-    if (this.dragMode === 'left-brightness') {
-      // Vertical drag on left: deltaY < 0 is upwards (increase)
-      const change = (-deltaY / bounds.height) * 100;
-      const newBrightness = Math.max(0, Math.min(100, Math.round(startBrightness + change)));
-      this.options.onBrightnessChange(newBrightness);
-    } else if (this.dragMode === 'right-volume') {
-      // Vertical drag on right
-      const change = (-deltaY / bounds.height) * 100;
-      const newVolume = Math.max(0, Math.min(100, Math.round(startVolume + change)));
-      this.options.onVolumeChange(newVolume);
-    } else if (this.dragMode === 'center-scrub') {
-      // Horizontal scrub in center
-      if (duration > 0) {
-        // Scrub sensitivity: screen width = 90 seconds
-        const scrubRatio = deltaX / bounds.width;
-        const scrubSeconds = Math.round(scrubRatio * 90);
-        this.options.onScrubUpdate(scrubSeconds);
-      }
-    }
-  }
-
-  handlePointerUp(
-    e: React.PointerEvent<HTMLDivElement>,
-    bounds: DOMRect,
-    currentScrubOffset: number | null
-  ) {
-    if (!this.startPoint) return;
-    const x = e.clientX - bounds.left;
-    const y = e.clientY - bounds.top;
-    const deltaX = Math.abs(x - this.startPoint.x);
-    const deltaY = Math.abs(y - this.startPoint.y);
-    const elapsed = Date.now() - this.startPoint.time;
-
-    // If dragged horizontally in center
-    if (this.dragMode === 'center-scrub' && currentScrubOffset !== null && Math.abs(currentScrubOffset) > 0) {
-      this.options.onSeekDelta(currentScrubOffset);
-      this.options.onScrubUpdate(null);
-    }
-
-    // Tap detection (minimal movement within 250ms)
-    if (deltaX < 12 && deltaY < 12 && elapsed < 300) {
-      const now = Date.now();
-      const xRatio = x / bounds.width;
-
-      // Check double-tap
-      if (now - this.lastTapTime < 320 && Math.abs(x - this.lastTapX) < 80) {
-        if (xRatio < 0.3) {
-          // Double-tap left: seek backward 10s
-          this.options.onDoubleTapSeek('backward');
-        } else if (xRatio > 0.7) {
-          // Double-tap right: seek forward 10s
-          this.options.onDoubleTapSeek('forward');
-        } else {
-          // Double-tap center: cycle aspect ratio
-          this.options.onAspectCycle();
-        }
+    if (this.scrubOffset !== null) this.options.onSeekDelta(this.scrubOffset);
+    if (Math.abs(x - this.startPoint.x) < 10 && Math.abs(y - this.startPoint.y) < 10
+      && now - this.startPoint.time < 300) {
+      if (this.lastTapTime > 0 && now - this.lastTapTime < 320 && Math.abs(x - this.lastTapX) < 80) {
+        clearTimeout(this.tapTimer);
+        if (x / bounds.width < 0.3) this.options.onDoubleTapSeek('backward');
+        else if (x / bounds.width > 0.7) this.options.onDoubleTapSeek('forward');
+        else this.options.onAspectCycle();
         this.lastTapTime = 0;
       } else {
-        // Single tap
+        clearTimeout(this.tapTimer);
         this.lastTapTime = now;
         this.lastTapX = x;
-        setTimeout(() => {
-          if (this.lastTapTime === now) {
-            this.options.onToggleHUD();
-          }
-        }, 220);
+        this.tapTimer = setTimeout(() => {
+          this.lastTapTime = 0;
+          this.options.onToggleHUD();
+        }, 320);
       }
     }
-
-    this.startPoint = null;
-    this.currentPoint = null;
-    this.dragMode = 'none';
+    this.cancel();
   }
 }

@@ -1,91 +1,78 @@
 # Theia
 
-> Touch-first, cross-platform port of [Dion](https://github.com/tomer6285/dion) targeting **React Native (Android APK)**, **Web (PWA)**, and **Desktop (Electron)** from a unified monorepo.
+A touch-friendly media browser and player for web, Electron, and Android, built with TypeScript and React.
 
----
+## Workspace
 
-## Architecture Overview
+- `packages/core`: metadata, provider discovery, provider token compatibility, subtitles, and persisted watch state.
+- `packages/ui`: web components, dark theme, accessible controls, and dialogs.
+- `packages/player`: HLS/HTML video player for web; Expo AV and WebView player for React Native.
+- `apps/web`: Vite app with search, movie/show catalogs, favorites, history, and settings.
+- `apps/mobile`: Expo Router Android app with native playback and AsyncStorage persistence.
+- `apps/electron`: sandboxed desktop wrapper and application packaging.
+- `services/edge-proxy`: Cloudflare Worker for provider discovery and media routing. The development web server uses the same implementation.
 
-```text
-theia/
-├── packages/
-│   ├── core/                  # Pure TypeScript business logic (Zero UI dependencies)
-│   │   ├── src/
-│   │   │   ├── metadata/      # Stremio Cinemeta client (search, details, series)
-│   │   │   ├── providers/     # VidLink, VixSrc, Vidora scrapers & stream manager
-│   │   │   ├── crypto/        # XSalsa20-Poly1305 encryption & decryption (tweetnacl)
-│   │   │   ├── subtitles/     # WebVTT / SRT parser & ±50ms offset sync stepper
-│   │   │   ├── storage/       # Zustand vanilla state & persistent watch resume store
-│   │   │   └── types/         # Media, Episode, StreamSource, and Settings interfaces
-│   ├── ui/                    # Universal UI components (modern dark theme)
-│   │   ├── src/
-│   │   │   ├── components/    # MediaCard, EpisodeSheet, SearchBar, TouchPill, TouchSlider, SubtitleStepper
-│   │   │   └── theme/         # Colors, dark surface elevation, typography
-│   └── player/                # Platform-adaptive video engine
-│       ├── src/
-│       │   ├── VideoPlayer.tsx         # Universal platform resolver
-│       │   ├── VideoPlayer.native.tsx  # React Native ExoPlayer implementation
-│       │   ├── VideoPlayer.web.tsx     # Web/Electron implementation (hls.js + HTML5)
-│       │   └── gestures/               # Dual-zone volume/brightness, scrub, double-tap seek, screen lock
-├── apps/
-│   ├── mobile/                # React Native / Expo app (builds standalone Android APK)
-│   ├── web/                   # Vite PWA with touch-first bottom navigation
-│   └── electron/              # Electron wrapper with native header rewriting
-└── services/
-    └── edge-proxy/            # Cloudflare Worker for CORS & Referer spoofing
-```
+App source is included in version control; generated bundles, installers, native build folders, and dependencies are ignored.
 
----
+## Development
 
-## Touch Gestures Matrix
+Use Node.js 22 and the pnpm version declared in `package.json`.
 
-| Gesture | Location | Action | Visual Feedback |
-| :--- | :--- | :--- | :--- |
-| **Horizontal Drag** | Center screen | Timeline scrub | Floating time badge (`+00:45` / `24:15`) |
-| **Vertical Drag** | Left 35% of screen | Brightness adjust | Vertical slider overlay + sun icon |
-| **Vertical Drag** | Right 35% of screen | Volume adjust | Vertical slider overlay + speaker icon |
-| **Double-Tap** | Left edge (< 30%) | Seek backward 10s | Ripple effect + `◀◀ 10s` |
-| **Double-Tap** | Right edge (> 70%) | Seek forward 10s | Ripple effect + `10s ▶▶` |
-| **Double-Tap** | Center screen | Cycle aspect ratio | `Fit` ➔ `Fill` ➔ `16:9` toast |
-| **Single Tap** | Center screen | Toggle controls HUD | Smooth fade of HUD (auto-hides after 4s) |
-| **Screen Lock** | HUD button | Freeze touch input | Lock icon; prevents accidental touches |
-| **Subtitle Stepper** | Subtitles icon | Fine-tune timing | Modal with `[-50ms]`, `[+50ms]` & slider |
-
----
-
-## Quick Start
-
-### 1. Install Dependencies
 ```bash
-pnpm install
-```
-
-### 2. Run Tests
-```bash
-pnpm test
-```
-Runs the full Vitest suite in `@theia/core` verifying XSalsa20-Poly1305 encryption/decryption, Cinemeta parsing, Provider Manager failover, Subtitle cue offsetting, and Zustand state persistence.
-
-### 3. Build All Packages
-```bash
+pnpm install --frozen-lockfile
 pnpm build
-```
-Uses **Turborepo** to build `@theia/core`, `@theia/ui`, `@theia/player`, `@theia/edge-proxy`, `@theia/web`, and `@theia/electron`.
-
-### 4. Run Web Application
-```bash
 pnpm --filter @theia/web dev
 ```
-Starts the Vite dev server at `http://localhost:3000`.
 
-### 5. Run Electron Desktop App
+The web app runs at `http://localhost:3000`. Shared packages build before their dependents. `pnpm build` compiles the shared packages, Worker, web app, and Electron wrapper; it does not create an Android APK or desktop installer.
+
 ```bash
-pnpm --filter @theia/electron start
+pnpm test       # Core, proxy, player, UI, app-flow and dependency compatibility tests
+pnpm typecheck  # Checks all seven packages/apps, including mobile
+pnpm lint       # Currently runs type checks; no separate style linter is configured
 ```
 
-### 6. Build Android APK
+CI runs these checks and exports the Android JavaScript bundle.
+
+## Playback proxy
+
+Browser requests to some providers and media CDNs need a proxy because of CORS. In **Settings → Playback proxy address**, use `/api/proxy` for the local Vite server. The default is a direct connection.
+
+For a hosted web app or packaged Electron app, deploy `services/edge-proxy` and enter its full HTTPS address. Static Vite output does not include a proxy server. Electron keeps browser security enabled and also needs a proxy for sources without suitable CORS headers.
+
+The Worker handles GET/HEAD and byte ranges, preserves cancellation, follows validated redirects, and rewrites HLS playlist references, alternate tracks, initialization files, and encryption keys. Provider HTML can be fetched for discovery but is served as inert text. Application cookies and authorization headers are not forwarded upstream.
+
+Before exposing a proxy publicly, configure the Worker's `ALLOWED_HOSTS` binding with a comma-separated list of trusted provider/CDN hostnames. `*.example.com` allows subdomains. Configure deployment access and rate limits for your environment. The hostname checks reject local addresses and non-HTTP URLs, but do not independently resolve DNS; an allowlist should contain hosts you control or trust.
+
+## Desktop
+
 ```bash
-cd apps/mobile
-eas build -p android --profile preview
+pnpm build:electron
+pnpm start:electron
+pnpm dist:electron:linux
 ```
-Configured via `apps/mobile/eas.json` and `apps/mobile/app.json`.
+
+Other `dist:electron:*` scripts select Windows/macOS and architecture targets. The packaged app copies the web bundle into its resources and uses relative asset paths. Platform installers/signing require the corresponding build environment and credentials.
+
+## Android
+
+Native launcher/splash images derive from the web SVG mark. Run `pnpm assets:mobile` to regenerate them after updating the logo.
+
+```bash
+pnpm --filter @theia/mobile start
+pnpm --filter @theia/mobile exec expo export --platform android --output-dir dist --no-bytecode --max-workers 2
+```
+
+From `apps/mobile`, `eas build -p android --profile preview` creates an APK after EAS setup. The native entry points resolve shared source, so Metro does not require prebuilt shared `dist` folders.
+
+Direct streams use Expo AV with native controls, saved resume positions, request headers, and automatic next-episode resolution. Embeds use WebView. Keep-awake and landscape orientation are scoped to the player screen. AsyncStorage hydrates before the app mounts.
+
+## Playback behavior and limits
+
+Web playback supports timeline/keyboard seeking, brightness and volume gestures, a control lock, server switching, and SRT/WebVTT subtitle tracks with timing adjustments. Preferences control resume and automatic next-episode playback. Next episodes resolve fresh streams.
+
+Third-party embeds manage their own playback, captions, and progress. Theia cannot inspect their cross-origin playback state, so external embeds do not provide Theia watch-progress tracking or reliable automatic next-episode playback. Native external subtitle synchronization and the custom web gesture HUD are not implemented. Provider availability depends on external services and is not guaranteed by the local tests.
+
+The web manifest supports a standalone presentation; offline media and service-worker caching are not implemented.
+
+See [AUDIT.md](AUDIT.md) for audit findings, verification, dependency risks, and validation limits.

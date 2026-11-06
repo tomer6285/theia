@@ -3,39 +3,28 @@ export interface SubtitleCue {
   start: number; // in seconds
   end: number;   // in seconds
   text: string;
+  settings?: string;
 }
 
 /**
  * Parses timestamp string "00:01:23.456" or "00:01:23,456" into seconds
  */
 export function parseSubtitleTimestamp(ts: string): number {
-  const normalized = ts.trim().replace(',', '.');
-  const parts = normalized.split(':');
-  if (parts.length === 3) {
-    const hours = parseFloat(parts[0]);
-    const minutes = parseFloat(parts[1]);
-    const seconds = parseFloat(parts[2]);
-    return hours * 3600 + minutes * 60 + seconds;
-  } else if (parts.length === 2) {
-    const minutes = parseFloat(parts[0]);
-    const seconds = parseFloat(parts[1]);
-    return minutes * 60 + seconds;
-  }
-  return 0;
+  const match = ts.trim().match(/^(?:(\d+):)?(\d{2}):(\d{2}(?:[.,]\d{1,3})?)$/);
+  if (!match) return 0;
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3].replace(',', '.'));
+  return minutes < 60 && seconds < 60 ? hours * 3600 + minutes * 60 + seconds : 0;
 }
 
 /**
  * Formats seconds into WebVTT timestamp "00:00:00.000"
  */
 export function formatSubtitleTimestamp(seconds: number): string {
-  const validSec = Math.max(0, seconds);
-  const hrs = Math.floor(validSec / 3600);
-  const mins = Math.floor((validSec % 3600) / 60);
-  const secs = (validSec % 60).toFixed(3);
-
+  const millis = Math.round(Math.max(0, Number.isFinite(seconds) ? seconds : 0) * 1000);
   const pad = (n: number, size = 2) => String(n).padStart(size, '0');
-  const [s, ms] = secs.split('.');
-  return `${pad(hrs)}:${pad(mins)}:${pad(Number(s))}.${pad(Number(ms), 3)}`;
+  return `${pad(Math.floor(millis / 3600000))}:${pad(Math.floor(millis / 60000) % 60)}:${pad(Math.floor(millis / 1000) % 60)}.${pad(millis % 1000, 3)}`;
 }
 
 /**
@@ -46,7 +35,7 @@ export function parseSubtitles(content: string): SubtitleCue[] {
   const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
   let currentCue: Partial<SubtitleCue> | null = null;
-  const timeRegex = /((?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{3})\s*-->\s*((?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{3})/;
+  const timeRegex = /^((?:\d+:)?\d{2}:\d{2}[.,]\d{3})\s*-->\s*((?:\d+:)?\d{2}:\d{2}[.,]\d{3})(.*)$/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -61,10 +50,14 @@ export function parseSubtitles(content: string): SubtitleCue[] {
 
     const match = line.match(timeRegex);
     if (match) {
+      if (currentCue?.text && currentCue.start !== undefined && currentCue.end !== undefined) {
+        cues.push(currentCue as SubtitleCue);
+      }
       currentCue = {
         start: parseSubtitleTimestamp(match[1]),
         end: parseSubtitleTimestamp(match[2]),
         text: '',
+        ...(match[3].trim() ? { settings: match[3].trim() } : {}),
       };
       continue;
     }
@@ -86,14 +79,15 @@ export function parseSubtitles(content: string): SubtitleCue[] {
  */
 export function offsetSubtitlesVTT(content: string, offsetMs: number): string {
   const cues = parseSubtitles(content);
-  const offsetSec = offsetMs / 1000;
+  const offsetSec = Number.isFinite(offsetMs) ? offsetMs / 1000 : 0;
 
   let vtt = 'WEBVTT\n\n';
   cues.forEach((cue, idx) => {
     const newStart = Math.max(0, cue.start + offsetSec);
     const newEnd = Math.max(0, cue.end + offsetSec);
+    if (newEnd <= newStart) return;
     vtt += `${idx + 1}\n`;
-    vtt += `${formatSubtitleTimestamp(newStart)} --> ${formatSubtitleTimestamp(newEnd)}\n`;
+    vtt += `${formatSubtitleTimestamp(newStart)} --> ${formatSubtitleTimestamp(newEnd)}${cue.settings ? ` ${cue.settings}` : ''}\n`;
     vtt += `${cue.text}\n\n`;
   });
 

@@ -57,8 +57,10 @@ export function encryptVidlinkToken(
   const nonce = new Uint8Array(24); // 24-byte zero nonce as used by VidLink
 
   const timestamp = Math.floor(Date.now() / 1000) + offsetSeconds;
-  const encoder = new TextEncoder();
-  const mediaIdBytes = encoder.encode(mediaId);
+  // Hermes on the supported RN version does not guarantee TextEncoder globals.
+  const utf8 = encodeURIComponent(mediaId).replace(/%([0-9A-F]{2})/g,
+    (_, byte: string) => String.fromCharCode(parseInt(byte, 16)));
+  const mediaIdBytes = Uint8Array.from(utf8, (character) => character.charCodeAt(0));
 
   // 8-byte big-endian unsigned integer (>Q)
   const tsBuffer = new ArrayBuffer(8);
@@ -108,8 +110,8 @@ export function decryptVidlinkToken(
     const mediaIdBytes = decrypted.subarray(0, decrypted.length - 8);
     const tsBytes = decrypted.subarray(decrypted.length - 8);
 
-    const decoder = new TextDecoder();
-    const mediaId = decoder.decode(mediaIdBytes);
+    const mediaId = decodeURIComponent(Array.from(mediaIdBytes,
+      (byte) => `%${byte.toString(16).padStart(2, '0')}`).join(''));
 
     const tsView = new DataView(tsBytes.buffer, tsBytes.byteOffset, 8);
     const timestamp = Number(tsView.getBigUint64(0, false));

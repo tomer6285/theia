@@ -50,36 +50,33 @@ export class ProviderManager {
     const results: StreamSource[] = [];
 
     const promises = activeProviders.map(async (provider) => {
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let onAbort: (() => void) | undefined;
       try {
-        if (query.signal?.aborted) return [];
-
-        const streamPromise = provider.resolveStreams(query);
-        const timeoutPromise = new Promise<StreamSource[]>((_, reject) => {
-          const timer = setTimeout(
-            () => reject(new Error(`Timeout resolving ${provider.name}`)),
-            this.timeoutMs
-          );
-
-          if (query.signal) {
-            query.signal.addEventListener(
-              'abort',
-              () => {
-                clearTimeout(timer);
-                reject(new DOMException('Aborted', 'AbortError'));
-              },
-              { once: true }
-            );
-          }
+        const cancelled = new Promise<StreamSource[]>((_, reject) => {
+          onAbort = () => {
+            controller.abort();
+            const error = new Error('Aborted');
+            error.name = 'AbortError';
+            reject(error);
+          };
+          query.signal?.addEventListener('abort', onAbort, { once: true });
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error(`Timeout resolving ${provider.name}`));
+          }, this.timeoutMs);
         });
-
-        const streams = await Promise.race([streamPromise, timeoutPromise]);
-        return streams;
-      } catch (err: any) {
-        if (err?.name === 'AbortError' || query.signal?.aborted) {
-          return [];
-        }
-        console.warn(`Provider [${provider.name}] failed:`, err);
+        return await Promise.race([
+          provider.resolveStreams({ ...query, signal: controller.signal }),
+          cancelled,
+        ]);
+      } catch (err: unknown) {
+        if (!query.signal?.aborted) console.warn(`Provider [${provider.name}] failed:`, err);
         return [];
+      } finally {
+        clearTimeout(timer);
+        if (onAbort) query.signal?.removeEventListener('abort', onAbort);
       }
     });
 
@@ -88,16 +85,28 @@ export class ProviderManager {
       return [];
     }
 
+    const seen = new Set<string>();
     for (const arr of streamArrays) {
-      results.push(...arr);
+      if (!Array.isArray(arr)) continue;
+      for (const stream of arr) {
+        if (!stream || typeof stream.url !== 'string' || !['hls', 'mp4', 'embed'].includes(stream.format)) continue;
+        try {
+          const url = new URL(stream.url);
+          if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) continue;
+        } catch { continue; }
+        const key = `${stream.format}:${stream.url}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push(stream);
+      }
     }
 
     // Sort by priority (higher first), prioritizing direct HLS/MP4 streams over embeds
     results.sort((a, b) => {
       const aTypeScore = a.format === 'hls' ? 30 : a.format === 'mp4' ? 20 : 10;
       const bTypeScore = b.format === 'hls' ? 30 : b.format === 'mp4' ? 20 : 10;
-      const aTotal = (a.priority || 50) + aTypeScore;
-      const bTotal = (b.priority || 50) + bTypeScore;
+      const aTotal = (a.priority ?? 50) + aTypeScore;
+      const bTotal = (b.priority ?? 50) + bTypeScore;
       return bTotal - aTotal;
     });
 
