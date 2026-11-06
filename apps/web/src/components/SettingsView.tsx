@@ -1,6 +1,6 @@
 import { useWatchState } from '@theia/ui';
 import React, { useState, useRef, useEffect } from 'react';
-import { theiaStore } from '@theia/core';
+import { theiaStore, getDefaultProxyUrl } from '@theia/core';
 import { colors, TouchPill, TouchSwitch } from '@theia/ui';
 
 export const SettingsView: React.FC = () => {
@@ -62,7 +62,7 @@ export const SettingsView: React.FC = () => {
             Web Stream CORS Proxy
           </h3>
           <p style={{ margin: 0, fontSize: '13px', color: colors.text.muted, lineHeight: '1.5' }}>
-            Some servers need a playback proxy. Enter your proxy address here, or leave it blank for a direct connection.
+            Some servers need a playback proxy. {getDefaultProxyUrl() ? 'The local server routes these requests automatically. Leave blank to use it, or enter a custom endpoint.' : 'Enter your proxy address here, or leave it blank for a direct connection.'}
           </p>
         </div>
 

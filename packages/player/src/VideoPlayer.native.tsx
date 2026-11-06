@@ -38,7 +38,8 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
           onShouldStartLoadWithRequest={(request) => /^https?:\/\//.test(request.url)} />
       ) : (
         <Video key={`${episode?.id || media.id}-${stream.url}-${attempt}`}
-          source={{ uri: stream.url, headers: stream.headers }}
+          source={{ uri: stream.url, headers: stream.headers,
+            overrideFileExtensionAndroid: stream.format === 'hls' ? 'm3u8' : undefined }}
           style={styles.video} useNativeControls resizeMode={ResizeMode.CONTAIN}
           shouldPlay={autoPlay} positionMillis={Math.max(0, start.current) * 1000}
           onPlaybackStatusUpdate={save} onError={() => setError('This stream could not be played. Try again or choose another server.')} />

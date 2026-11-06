@@ -36,7 +36,7 @@ CI runs these checks and exports the Android JavaScript bundle.
 
 ## Playback proxy
 
-Browser requests to some providers and media CDNs need a proxy because of CORS. In **Settings → Playback proxy address**, use `/api/proxy` for the local Vite server. The default is a direct connection.
+Browser requests to some providers and media CDNs need a proxy because of CORS. The local Vite app automatically uses its same-origin `/api/proxy`, including when opened over a LAN IP. Leaving **Settings → Playback proxy address** blank uses this automatic route; a custom endpoint overrides it. Static production builds use a direct connection until a proxy is configured.
 
 For a hosted web app or packaged Electron app, deploy `services/edge-proxy` and enter its full HTTPS address. Static Vite output does not include a proxy server. Electron keeps browser security enabled and also needs a proxy for sources without suitable CORS headers.
 
@@ -69,7 +69,7 @@ Direct streams use Expo AV with native controls, saved resume positions, request
 
 ## Playback behavior and limits
 
-Web playback supports timeline/keyboard seeking, brightness and volume gestures, a control lock, server switching, and SRT/WebVTT subtitle tracks with timing adjustments. Preferences control resume and automatic next-episode playback. Next episodes resolve fresh streams.
+Web playback supports timeline/keyboard seeking, brightness and volume gestures, a control lock, server switching, HLS audio language selection, and external SRT/WebVTT subtitle tracks with timing adjustments. VixSrc discovery consumes its short-lived embed token immediately and extracts a signed HLS playlist for the built-in player; it does not load a sandbox-incompatible iframe. Preferences control resume and automatic next-episode playback. Next episodes resolve fresh streams.
 
 Third-party embeds manage their own playback, captions, and progress. Theia cannot inspect their cross-origin playback state, so external embeds do not provide Theia watch-progress tracking or reliable automatic next-episode playback. Native external subtitle synchronization and the custom web gesture HUD are not implemented. Provider availability depends on external services and is not guaranteed by the local tests.
 

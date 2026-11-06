@@ -1,6 +1,7 @@
+import { preferredTrackIndex } from './languages';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
-import { theiaStore, offsetSubtitlesVTT } from '@theia/core';
+import { theiaStore, offsetSubtitlesVTT, proxyResourceUrl } from '@theia/core';
 import { colors, TouchSlider, SubtitleStepper, TouchPill } from '@theia/ui';
 import { VideoPlayerProps, AspectRatioMode } from './types';
 import { GestureCoordinator } from './gestures/coordinator';
@@ -18,6 +19,9 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   initialTime,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const [audioTracks, setAudioTracks] = useState<Array<{ id: number; label: string }>>([]);
+  const [audioTrack, setAudioTrack] = useState(-1);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const showTemporarily = (key: string, callback: () => void, delay: number) => {
     clearTimeout(timers.current.get(key));
@@ -96,6 +100,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       : settings.autoResume && saved && !saved.completed ? saved.positionSeconds : 0;
     setCurrentTime(requestedTime.current);
     setDuration(0);
+    setAudioTracks([]);
+    setAudioTrack(-1);
     setIsPlaying(false);
     setIsBuffering(true);
     setPlaybackError(null);
@@ -103,13 +109,9 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     let networkRetries = 0;
     let mediaRetries = 0;
     let streamUrl = stream.url;
-    if (stream.requiresProxy && settings.proxyUrl) {
+    if (stream.requiresProxy) {
       try {
-        const proxy = new URL(settings.proxyUrl, window.location.href);
-        if (!['http:', 'https:'].includes(proxy.protocol)) throw new Error('Invalid proxy');
-        proxy.searchParams.set('url', stream.url);
-        proxy.searchParams.set('referer', stream.headers?.Referer || 'https://vixsrc.to/');
-        streamUrl = proxy.href;
+        streamUrl = proxyResourceUrl(stream.url, stream.headers?.Referer || 'https://vixsrc.to/');
       } catch {
         setIsBuffering(false);
         setPlaybackError('The playback proxy address is invalid. Update it in Settings.');
@@ -123,6 +125,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     if (stream.format === 'hls' && Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, backBufferLength: 30, maxBufferLength: 30,
         startPosition: requestedTime.current || -1 });
+      hlsRef.current = hls;
+      // Provider defaults can select a different language and forced captions.
+      hls.subtitleDisplay = false;
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
+        setAudioTracks(data.audioTracks.map((track, index) => ({ id: index, label: track.name || track.lang || `Track ${index + 1}` })));
+        const index = preferredTrackIndex(data.audioTracks, settings.preferredLanguages);
+        if (index >= 0 && hls) hls.audioTrack = index;
+      });
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => setAudioTrack(data.id));
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (!data.fatal) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRetries++ < 2) hls?.startLoad();
@@ -140,6 +151,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       saveVideoProgress(video);
       lastPosition.current = { key: mediaKey, time: video.currentTime };
       hls?.destroy();
+      hlsRef.current = null;
       video.removeAttribute('src');
       video.load();
     };
@@ -295,7 +307,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       aria-label={`${media.title} player`}
       tabIndex={0}
       onKeyDown={(event) => {
-        if ((event.target as HTMLElement).closest('button, input, [role="slider"], [role="dialog"]')) return;
+        if ((event.target as HTMLElement).closest('button, input, select, [role="slider"], [role="dialog"]')) return;
         if (event.key === 'Escape') { onBack?.(); return; }
         if (isLocked) return;
         if (event.key === ' ' || event.key === 'k') { event.preventDefault(); handleTogglePlay(); }
@@ -319,7 +331,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         touchAction: 'none',
       }}
       onPointerDown={(e) => {
-        if ((e.target as HTMLElement).closest('button, input, [role="slider"], [role="dialog"]')) return;
+        if ((e.target as HTMLElement).closest('button, input, select, [role="slider"], [role="dialog"]')) return;
         if (!e.isPrimary || e.button !== 0) return;
         e.currentTarget.setPointerCapture?.(e.pointerId);
         if (isLocked) {
@@ -993,7 +1005,13 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               <span style={{ fontSize: '14px', color: '#fff', fontWeight: 700 }}>
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
-              <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {audioTracks.length > 1 && <select aria-label="Audio language" value={audioTrack}
+                  onChange={(event) => { if (hlsRef.current) hlsRef.current.audioTrack = Number(event.target.value); }}
+                  style={{ background: '#18181b', color: '#fff', border: '1px solid #3f3f46', borderRadius: 8, padding: 8, maxWidth: 140 }}>
+                  {audioTrack < 0 && <option value={-1}>Audio language</option>}
+                  {audioTracks.map((track) => <option key={track.id} value={track.id}>{track.label}</option>)}
+                </select>}
                 {hasNextEpisode && onNextEpisode && (
                   <button
                     type="button"
