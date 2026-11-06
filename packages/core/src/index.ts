@@ -4,3 +4,4 @@ export * from './metadata';
 export * from './providers';
 export * from './subtitles';
 export * from './storage';
+export * from './network/config';

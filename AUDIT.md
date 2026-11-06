@@ -82,4 +82,17 @@ These remain unresolved. A supported Expo/React Native upgrade should replace th
 - Android Metro export succeeds with the native player included.
 - `git diff --check` passes.
 
-No signed APK or desktop installer was built. No physical device, interactive browser layout check, deployed Worker, or live third-party playback was tested. Browser-specific media policies, native subtitle parity, upstream provider changes, desktop installer behavior, and device gestures still need real environment testing. The proxy hostname validation is not a DNS resolver; production deployments should set trusted `ALLOWED_HOSTS` and their own access/rate limits. The web manifest does not implement offline caching.
+No signed APK or desktop installer was built. The initial audit did not exercise a physical device, interactive browser layout check, deployed Worker, or live third-party playback. Live playback checks from the subsequent streaming fix are recorded below. Browser-specific media policies, native subtitle parity, upstream provider changes, desktop installer behavior, and device gestures still need real environment testing. The proxy hostname validation is not a DNS resolver; production deployments should set trusted `ALLOWED_HOSTS` and their own access/rate limits. The web manifest does not implement offline caching.
+
+
+## Streaming follow-up
+
+A live playback report exposed gaps that the initial mocked tests did not cover:
+
+- The development browser app defaulted to direct cross-origin requests despite having a working local proxy. It now selects the same-origin proxy automatically, respects custom endpoints, and preserves native/static defaults. The player and provider discovery share URL construction.
+- VixSrc embed links expire within seconds and reject sandboxed iframes. Discovery now fetches a fresh API response, immediately consumes the embed token, and parses only literal signed HLS parameters without executing provider JavaScript. The app uses direct HLS and does not advertise an iframe fallback that cannot work with its sandbox.
+- VidLink returned upstream access errors but was advertised as an available embed. Its fallback page is now checked before offering it. Upstream access restrictions are not bypassed.
+- Direct HLS honors preferred audio languages (including ISO-639-2 tags), provides an audio selector, and does not force the provider's default captions. Android identifies extensionless HLS URLs explicitly.
+- Added regressions for automatic LAN routing, short-lived-token handling, unavailable sources, signed playlist extraction, HLS recovery limits, and audio selection.
+
+Live isolated Chromium checks against `http://10.142.1.205:3000` verified direct movie and series playback, positive decoded video dimensions/frame counts, advancing time, and English audio selection. The shared T3 preview browser was unavailable because of host AppArmor restrictions, so these checks used a separate test browser with an isolated profile. External provider availability remains outside the app's control.

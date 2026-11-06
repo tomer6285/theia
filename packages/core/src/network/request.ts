@@ -1,4 +1,4 @@
-import { theiaStore } from '../storage';
+import { getProxyUrl, proxyResourceUrl } from './config';
 
 /** Responses here are small JSON/HTML documents. Keep timeout and cancellation
  * active through body consumption, and release every timer and listener. */
@@ -24,15 +24,12 @@ export async function fetchWithTimeout(
 
 /** Provider discovery also needs CORS routing in browsers, before a stream exists. */
 export async function fetchProviderResponse(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
-  const proxyUrl = theiaStore.getState().settings.proxyUrl;
+  const proxyUrl = getProxyUrl();
   if (!proxyUrl) return fetchWithTimeout(url, init, signal);
-  const proxy = new URL(proxyUrl, typeof location !== 'undefined' ? location.href : undefined);
-  if (!['http:', 'https:'].includes(proxy.protocol)) throw new Error('Invalid proxy URL');
   const headers = new Headers(init.headers);
-  proxy.searchParams.set('url', url);
-  proxy.searchParams.set('referer', headers.get('Referer') || new URL(url).origin + '/');
+  const proxy = proxyResourceUrl(url, headers.get('Referer') || new URL(url).origin + '/');
   headers.delete('Referer');
   headers.delete('Origin');
   headers.delete('User-Agent');
-  return fetchWithTimeout(proxy.href, { ...init, headers }, signal);
+  return fetchWithTimeout(proxy, { ...init, headers }, signal);
 }

@@ -98,7 +98,7 @@ export class VidLinkProvider implements IProvider {
                       quality: q.quality || 'auto',
                       url: q.url,
                       format: q.url.includes('.m3u8') ? 'hls' : 'mp4',
-                headers: {
+                      headers: {
                         'Referer': `${this.baseUrl}/`,
                         'Origin': this.baseUrl,
                       },
@@ -124,6 +124,17 @@ export class VidLinkProvider implements IProvider {
     }
 
     if (query.signal?.aborted) return [];
+
+    if (!streams.length) {
+      if (!mediaId) return [];
+      const pageUrl = isTv ? `${this.baseUrl}/tv/${mediaId}/${query.season}/${query.episode}` : `${this.baseUrl}/movie/${mediaId}`;
+      try {
+        const page = await fetchProviderResponse(pageUrl, { headers: { Referer: `${this.baseUrl}/` } }, query.signal);
+        if (!page.ok) return [];
+        const html = await page.text();
+        if (/Application error:|cf-error-details|This player cannot|NEXT_NOT_FOUND/i.test(html)) return [];
+      } catch { return []; }
+    }
 
     // Embed fallback / direct link
     // Only register VidLink TV embed if a numeric TMDb ID is known (prevents Next.js crash Digest 4082599258)
