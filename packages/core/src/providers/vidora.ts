@@ -1,3 +1,4 @@
+import { fetchProviderResponse } from '../network/request';
 import { IProvider, ProviderQuery, StreamSource } from '../types';
 
 export class VidoraProvider implements IProvider {
@@ -8,31 +9,24 @@ export class VidoraProvider implements IProvider {
 
   async resolveStreams(query: ProviderQuery): Promise<StreamSource[]> {
     const streams: StreamSource[] = [];
+    if (query.type === 'series' && (query.season === undefined || query.episode === undefined)) return streams;
     if (query.signal?.aborted) return streams;
 
     const mediaId = query.imdbId || query.tmdbId;
     if (!mediaId) return streams;
 
-    const embedUrl = query.type === 'series' && query.season && query.episode
+    const embedUrl = query.type === 'series' && query.season !== undefined && query.episode !== undefined
       ? `${this.baseUrl}/tv/${mediaId}/${query.season}/${query.episode}?autoplay=true`
       : `${this.baseUrl}/movie/${mediaId}?autoplay=true`;
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-      if (query.signal) {
-        query.signal.addEventListener('abort', () => controller.abort(), { once: true });
-      }
-
-      const res = await fetch(embedUrl, {
-        signal: controller.signal,
+      const res = await fetchProviderResponse(embedUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Referer': `${this.baseUrl}/`,
         },
-      });
-      clearTimeout(timeoutId);
+      }, query.signal);
 
       if (res.ok) {
         const html = await res.text();

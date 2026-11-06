@@ -1,3 +1,4 @@
+import { useModal } from '../useModal';
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { MediaItem, Episode, SeasonInfo, WatchProgress } from '@theia/core';
@@ -24,6 +25,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
   currentEpisodeId,
   progressMap = {},
 }) => {
+  const dialogRef = useModal(isOpen, onClose);
   const seasons: SeasonInfo[] = media.seasons || [];
   const [selectedSeason, setSelectedSeason] = useState<number>(() => {
     return seasons.find((s) => s.season === 1)?.season ?? seasons[0]?.season ?? 1;
@@ -59,13 +61,6 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
           + list.scrollTop - (list.clientHeight - active.clientHeight) / 2)
       : 0;
   }, [isOpen, selectedSeason, media.id, currentEpisodeId]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, [isOpen]);
 
   const currentSeasonInfo = seasons.find((s) => s.season === selectedSeason) || seasons[0];
   const allSeasonEpisodes = currentSeasonInfo?.episodes || media.episodes || [];
@@ -130,6 +125,12 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${media.title} episodes`}
+        tabIndex={-1}
+        className="episode-sheet"
         style={{
           backgroundColor: colors.bg.surface,
           borderTopLeftRadius: 28,

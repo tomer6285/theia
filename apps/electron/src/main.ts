@@ -1,0 +1,108 @@
+import { pathToFileURL } from 'url';
+import { app, BrowserWindow, session } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
+
+let mainWindow: BrowserWindow | null = null;
+
+function resolveWebIndexPath(): string {
+  const candidates = [
+    path.join(process.resourcesPath, 'web/index.html'),
+    path.join(__dirname, '../../web/dist/index.html'),
+    path.join(__dirname, '../web/dist/index.html'),
+    path.join(app.getAppPath(), 'web/dist/index.html'),
+    path.join(app.getAppPath(), 'dist/index.html'),
+  ];
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+  return candidates[0];
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 800,
+    minHeight: 500,
+    backgroundColor: '#09090b',
+    title: 'Theia',
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      sandbox: true,
+    },
+  });
+
+  // Intercept and rewrite outgoing headers to bypass anti-hotlinking and CORS
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*/*'] },
+    (details, callback) => {
+      const hostname = new URL(details.url).hostname;
+      const matches = (domain: string) => hostname === domain || hostname.endsWith(`.${domain}`);
+
+      if (matches('vixsrc.to')) {
+        details.requestHeaders['Referer'] = 'https://vixsrc.to/';
+        details.requestHeaders['Origin'] = 'https://vixsrc.to';
+      } else if (matches('vidlink.pro')) {
+        details.requestHeaders['Referer'] = 'https://vidlink.pro/';
+        details.requestHeaders['Origin'] = 'https://vidlink.pro';
+      } else if (matches('vidora.su')) {
+        details.requestHeaders['Referer'] = 'https://vidora.su/';
+        details.requestHeaders['Origin'] = 'https://vidora.su';
+      }
+
+      details.requestHeaders['User-Agent'] =
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+      callback({ cancel: false, requestHeaders: details.requestHeaders });
+    }
+  );
+
+  const indexPath = resolveWebIndexPath();
+  const appDocumentPath = new URL(pathToFileURL(indexPath).href).pathname;
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, target) => {
+    const destination = new URL(target);
+    const isAppDocument = destination.protocol === 'file:' && destination.pathname === appDocumentPath;
+    const isDevServer = destination.origin === 'http://localhost:3000' && !app.isPackaged;
+    if (!isAppDocument && !isDevServer) {
+      event.preventDefault();
+    }
+  });
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+
+  if (app.isPackaged || process.env.NODE_ENV === 'production') {
+    mainWindow.loadFile(indexPath);
+  } else {
+    mainWindow.loadURL('http://localhost:3000').catch(() => {
+      mainWindow?.loadFile(indexPath);
+    });
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+app.whenReady().then(() => {
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});

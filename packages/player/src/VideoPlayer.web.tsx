@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
-import { theiaStore, StreamSource, formatSubtitleTimestamp } from '@theia/core';
+import { theiaStore, offsetSubtitlesVTT } from '@theia/core';
 import { colors, TouchSlider, SubtitleStepper, TouchPill } from '@theia/ui';
 import { VideoPlayerProps, AspectRatioMode } from './types';
 import { GestureCoordinator } from './gestures/coordinator';
@@ -18,6 +18,12 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   initialTime,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const showTemporarily = (key: string, callback: () => void, delay: number) => {
+    clearTimeout(timers.current.get(key));
+    timers.current.set(key, setTimeout(callback, delay));
+  };
+  useEffect(() => () => { timers.current.forEach(clearTimeout); timers.current.clear(); }, []);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Player state
@@ -36,7 +42,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   const [showVolume, setShowVolume] = useState(false);
   const [scrubOffset, setScrubOffset] = useState<number | null>(null);
   const [doubleTapFeedback, setDoubleTapFeedback] = useState<'forward' | 'backward' | null>(null);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatioMode>('fit');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatioMode>(theiaStore.getState().settings.aspectRatio);
   const [aspectToast, setAspectToast] = useState<string | null>(null);
 
   // Subtitle Stepper modal state
@@ -50,133 +56,148 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   // Auto-next episode countdown banner (last 30s)
   const [showNextOverlay, setShowNextOverlay] = useState(false);
 
-  // Load saved resume time and subtitle offset
-  const mediaKey = episode ? episode.id : media.id;
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [subtitleUrl, setSubtitleUrl] = useState('');
+  const [subtitleError, setSubtitleError] = useState<string | null>(null);
+  const mediaKey = episode?.id || media.id;
+  const lastPosition = useRef<{ key: string; time: number } | null>(null);
+  const requestedTime = useRef(0);
+
+  const saveVideoProgress = useCallback((video: HTMLVideoElement | null) => {
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0 || video.currentTime <= 0) return;
+    const percentage = video.currentTime / video.duration * 100;
+    theiaStore.getState().updateProgress({
+      mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
+      positionSeconds: video.currentTime, durationSeconds: video.duration, percentage,
+      completed: video.ended || percentage > 92, updatedAt: Date.now(),
+    }, media);
+  }, [media, episode]);
+  const saveProgress = useCallback(() => saveVideoProgress(videoRef.current), [saveVideoProgress]);
+
   useEffect(() => {
-    const saved = theiaStore.getState().getProgress(media.id, episode?.id);
-    const savedOffset = theiaStore.getState().getSubtitleOffset(media.id);
-    setSubtitleOffsetMs(savedOffset);
+    setSubtitleOffsetMs(theiaStore.getState().getSubtitleOffset(media.id));
+    setShowNextOverlay(false);
+    setIsHUDVisible(true);
+  }, [mediaKey]);
 
-    if (initialTime !== undefined) {
-      setCurrentTime(initialTime);
-    } else if (saved && saved.positionSeconds > 5 && !saved.completed) {
-      setCurrentTime(saved.positionSeconds);
-    }
-  }, [media.id, episode?.id, initialTime]);
-
-  // HLS stream setup
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
     if (stream.format === 'embed') {
       setIsBuffering(false);
+      setPlaybackError(null);
       return;
     }
-
+    const video = videoRef.current;
+    if (!video) return;
+    const settings = theiaStore.getState().settings;
+    const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+    requestedTime.current = lastPosition.current?.key === mediaKey ? lastPosition.current.time
+      : initialTime !== undefined ? Math.max(0, initialTime)
+      : settings.autoResume && saved && !saved.completed ? saved.positionSeconds : 0;
+    setCurrentTime(requestedTime.current);
+    setDuration(0);
+    setIsPlaying(false);
+    setIsBuffering(true);
+    setPlaybackError(null);
     let hls: Hls | null = null;
+    let networkRetries = 0;
+    let mediaRetries = 0;
     let streamUrl = stream.url;
-
-    // Route through edge proxy if required and configured
-    const proxyUrl = theiaStore.getState().settings.proxyUrl;
-    if (stream.requiresProxy && proxyUrl) {
-      const referer = stream.headers?.Referer || 'https://vixsrc.to/';
-      streamUrl = `${proxyUrl}?url=${encodeURIComponent(stream.url)}&referer=${encodeURIComponent(referer)}`;
+    if (stream.requiresProxy && settings.proxyUrl) {
+      try {
+        const proxy = new URL(settings.proxyUrl, window.location.href);
+        if (!['http:', 'https:'].includes(proxy.protocol)) throw new Error('Invalid proxy');
+        proxy.searchParams.set('url', stream.url);
+        proxy.searchParams.set('referer', stream.headers?.Referer || 'https://vixsrc.to/');
+        streamUrl = proxy.href;
+      } catch {
+        setIsBuffering(false);
+        setPlaybackError('The playback proxy address is invalid. Update it in Settings.');
+        return;
+      }
     }
-
-    if (Hls.isSupported() && (streamUrl.includes('.m3u8') || stream.format === 'hls')) {
-      hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 120,
-        maxBufferSize: 60 * 1000 * 1000,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        nudgeOffset: 0.1,
-        nudgeMaxRetry: 5,
+    const fail = () => {
+      setIsBuffering(false);
+      setPlaybackError('This stream could not be played. Retry or choose another server.');
+    };
+    if (stream.format === 'hls' && Hls.isSupported()) {
+      hls = new Hls({ enableWorker: true, backBufferLength: 30, maxBufferLength: 30,
+        startPosition: requestedTime.current || -1 });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRetries++ < 2) hls?.startLoad();
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRetries++ < 1) hls?.recoverMediaError();
+        else { hls?.destroy(); fail(); }
       });
-
       hls.loadSource(streamUrl);
       hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setIsBuffering(false);
-        if (currentTime > 0) {
-          video.currentTime = currentTime;
-        }
-        if (autoPlay) {
-          video.play().catch(() => setIsPlaying(false));
-        }
-      });
-
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              hls?.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              hls?.recoverMediaError();
-              break;
-            default:
-              hls?.destroy();
-              break;
-          }
-        }
-      });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl') || stream.format === 'mp4') {
+    } else if (stream.format === 'mp4' || video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamUrl;
-      if (currentTime > 0) {
-        video.currentTime = currentTime;
-      }
-      if (autoPlay) {
-        video.play().catch(() => setIsPlaying(false));
-      }
-    }
+      video.load();
+    } else fail();
 
     return () => {
-      if (hls) {
-        hls.destroy();
-      }
+      saveVideoProgress(video);
+      lastPosition.current = { key: mediaKey, time: video.currentTime };
+      hls?.destroy();
+      video.removeAttribute('src');
+      video.load();
     };
-  }, [stream.url, stream.format]);
+  }, [stream.url, stream.format, stream.requiresProxy, mediaKey, initialTime, retryCount]);
 
-  // Auto-save watch position every 5s and on pause
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (videoRef.current && duration > 0) {
-        const time = videoRef.current.currentTime;
-        const percentage = (time / duration) * 100;
-        const completed = percentage > 92;
+    const interval = setInterval(saveProgress, 5000);
+    const onVisibility = () => { if (document.hidden) saveProgress(); };
+    window.addEventListener('pagehide', saveProgress);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('pagehide', saveProgress);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [saveProgress]);
 
-        theiaStore.getState().updateProgress(
-          {
-            mediaId: media.id,
-            episodeId: episode?.id,
-            season: episode?.season,
-            episode: episode?.episode,
-            positionSeconds: Math.floor(time),
-            durationSeconds: Math.floor(duration),
-            percentage,
-            completed,
-            updatedAt: Date.now(),
-          },
-          media
-        );
+  useEffect(() => {
+    const preferred = theiaStore.getState().settings.preferredSubtitles;
+    setSelectedSubId(stream.subtitles?.find((track) => track.isDefault)?.id
+      || stream.subtitles?.find((track) => preferred.includes(track.language))?.id || '');
+  }, [stream.id, stream.url]);
+
+  useEffect(() => {
+    setSubtitleUrl('');
+    setSubtitleError(null);
+    const track = stream.subtitles?.find((sub) => sub.id === selectedSubId);
+    if (!track || stream.format === 'embed') return;
+    const controller = new AbortController();
+    let objectUrl: string | undefined;
+    async function load() {
+      try {
+        const response = await fetch(track!.url, { signal: controller.signal });
+        if (!response.ok) throw new Error('Subtitle unavailable');
+        const content = await response.text();
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(new Blob([offsetSubtitlesVTT(content, subtitleOffsetMs)], { type: 'text/vtt' }));
+        setSubtitleUrl(objectUrl);
+      } catch {
+        if (!controller.signal.aborted) setSubtitleError('Subtitles could not be loaded. Try another track.');
       }
-    }, 5000);
+    }
+    void load();
+    return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [selectedSubId, subtitleOffsetMs, stream.url, stream.format]);
 
-    return () => clearInterval(interval);
-  }, [media.id, episode?.id, duration]);
+  useEffect(() => {
+    if (!isPlaying || !isHUDVisible || isSubModalOpen || isStreamSelectorOpen) return;
+    const timer = setTimeout(() => setIsHUDVisible(false), 4000);
+    return () => clearTimeout(timer);
+  }, [isPlaying, isHUDVisible, isSubModalOpen, isStreamSelectorOpen, currentTime === 0]);
 
   const handleCycleAspect = () => {
     setAspectRatio((current) => {
       const next: AspectRatioMode =
         current === 'fit' ? 'fill' : current === 'fill' ? '16:9' : 'fit';
       setAspectToast(`Aspect Ratio: ${next.toUpperCase()}`);
-      setTimeout(() => setAspectToast(null), 1500);
+      showTemporarily('aspect', () => setAspectToast(null), 1500);
       return next;
     });
   };
@@ -200,7 +221,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       onBrightnessChange: (newB) => {
         setBrightness(newB);
         setShowBrightness(true);
-        setTimeout(() => setShowBrightness(false), 1500);
+        showTemporarily('brightness', () => setShowBrightness(false), 1500);
       },
       onVolumeChange: (newV) => {
         setVolume(newV);
@@ -208,7 +229,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           videoRef.current.volume = newV / 100;
         }
         setShowVolume(true);
-        setTimeout(() => setShowVolume(false), 1500);
+        showTemporarily('volume', () => setShowVolume(false), 1500);
       },
       onScrubUpdate: (offset) => {
         setScrubOffset(offset);
@@ -220,11 +241,12 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           videoRef.current.currentTime = target;
           setCurrentTime(target);
           setDoubleTapFeedback(direction);
-          setTimeout(() => setDoubleTapFeedback(null), 800);
+          showTemporarily('seek', () => setDoubleTapFeedback(null), 800);
         }
       },
       onAspectCycle: handleCycleAspect,
     });
+    return () => coordinatorRef.current?.dispose();
   }, [duration, isLocked]);
 
   // Video event handlers
@@ -247,13 +269,12 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.play();
-      setIsPlaying(true);
+      void videoRef.current.play().catch(() => setIsPlaying(false));
     }
   };
 
   const formatTime = (secs: number) => {
-    const s = Math.floor(secs);
+    const s = Math.floor(Number.isFinite(secs) ? Math.max(0, secs) : 0);
     const m = Math.floor(s / 60);
     const h = Math.floor(m / 60);
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -269,6 +290,22 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   return (
     <div
       ref={containerRef}
+      className="video-player"
+      role="region"
+      aria-label={`${media.title} player`}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if ((event.target as HTMLElement).closest('button, input, [role="slider"], [role="dialog"]')) return;
+        if (event.key === 'Escape') { onBack?.(); return; }
+        if (isLocked) return;
+        if (event.key === ' ' || event.key === 'k') { event.preventDefault(); handleTogglePlay(); }
+        if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && videoRef.current) {
+          event.preventDefault();
+          videoRef.current.currentTime = Math.max(0, Math.min(duration,
+            videoRef.current.currentTime + (event.key === 'ArrowLeft' ? -10 : 10)));
+        }
+        setIsHUDVisible(true);
+      }}
       style={{
         position: 'relative',
         width: '100%',
@@ -279,12 +316,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        touchAction: 'manipulation',
+        touchAction: 'none',
       }}
       onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest('button, input, [role="slider"], [role="dialog"]')) return;
+        if (!e.isPrimary || e.button !== 0) return;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
         if (isLocked) {
           setShowLockNotice(true);
-          setTimeout(() => setShowLockNotice(false), 2200);
+          showTemporarily('lock', () => setShowLockNotice(false), 2200);
           return;
         }
         if (containerRef.current) {
@@ -307,8 +347,10 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           );
         }
       }}
+      onPointerCancel={() => coordinatorRef.current?.cancel()}
+      onLostPointerCapture={() => coordinatorRef.current?.cancel()}
       onPointerUp={(e) => {
-        if (containerRef.current) {
+        if (!isLocked && containerRef.current) {
           coordinatorRef.current?.handlePointerUp(
             e,
             containerRef.current.getBoundingClientRect(),
@@ -333,6 +375,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       {stream.format === 'embed' ? (
         <iframe
           src={stream.url}
+          title={`${media.title} — ${stream.name}`}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
           style={{ width: '100%', height: '100%', border: 'none' }}
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
           allowFullScreen
@@ -349,18 +393,48 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           }}
           playsInline
           onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
+          onPause={() => { setIsPlaying(false); saveProgress(); }}
+          onEnded={() => {
+            saveProgress();
+            if (hasNextEpisode && theiaStore.getState().settings.autoPlayNext) onNextEpisode?.();
+          }}
+          onError={() => {
+            setIsBuffering(false);
+            setPlaybackError('This stream could not be played. Retry or choose another server.');
+          }}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
             if (videoRef.current) {
-              setDuration(videoRef.current.duration);
+              const video = videoRef.current;
+              setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+              if (requestedTime.current > 0 && Number.isFinite(video.duration)) {
+                video.currentTime = Math.min(requestedTime.current, Math.max(0, video.duration - 1));
+              }
+              if (autoPlay) void video.play().catch(() => { setIsPlaying(false); setIsBuffering(false); });
             }
           }}
+          onCanPlay={() => setIsBuffering(false)}
           onWaiting={() => setIsBuffering(true)}
-          onPlaying={() => setIsBuffering(false)}
-        />
+          onPlaying={() => { setIsBuffering(false); setPlaybackError(null); }}
+        >
+          {subtitleUrl && <track key={subtitleUrl} kind="subtitles" src={subtitleUrl}
+            label="Selected subtitles" default onLoad={(event) => { event.currentTarget.track.mode = 'showing'; }} />}
+        </video>
       )}
 
+      {playbackError && (
+        <div role="alert" style={{ position: 'absolute', zIndex: 60, maxWidth: 380, margin: 20,
+          padding: 24, borderRadius: 20, background: '#18181b', color: '#fff', textAlign: 'center' }}>
+          <p style={{ marginBottom: 16 }}>{playbackError}</p>
+          <TouchPill label="Retry stream" onClick={() => setRetryCount((count) => count + 1)} />
+          {availableStreams.length > 1 && <TouchPill label="Choose server" onClick={() => {
+            setPlaybackError(null); setIsStreamSelectorOpen(true);
+          }} />}
+          {onBack && <TouchPill label="Back" onClick={onBack} />}
+        </div>
+      )}
+      {subtitleError && <div role="status" style={{ position: 'absolute', bottom: 120, zIndex: 55,
+        padding: 12, borderRadius: 12, background: '#18181b', color: '#fff' }}>{subtitleError}</div>}
       {/* Buffering Spinner */}
       {isBuffering && stream.format !== 'embed' && (
         <div
@@ -412,6 +486,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           <div style={{ height: 130, display: 'flex', alignItems: 'center' }}>
             <TouchSlider
               value={brightness}
+              label="Brightness"
               orientation="vertical"
               height={130}
               width={10}
@@ -449,6 +524,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           <div style={{ height: 130, display: 'flex', alignItems: 'center' }}>
             <TouchSlider
               value={volume}
+              label="Volume"
               orientation="vertical"
               height={130}
               width={10}
@@ -773,17 +849,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            padding: '24px 28px',
+            padding: 'clamp(12px, 3vw, 24px)',
             transition: 'opacity 0.25s ease',
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setIsHUDVisible(false);
-            }
+            // Surface taps are handled by the gesture coordinator.
           }}
         >
           {/* Top Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="player-topbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               {onBack && (
                 <button
@@ -808,7 +882,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             </div>
 
             {/* Quick action buttons in top bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 58 }}>
+            <div className="player-quick-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 58, flexWrap: 'wrap' }}>
               {/* Aspect Ratio Button */}
               <button
                 type="button"
@@ -855,7 +929,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               alignSelf: 'center',
               display: 'flex',
               alignItems: 'center',
-              gap: 36,
+              gap: 'clamp(12px, 4vw, 36px)',
             }}
           >
             <button
@@ -904,6 +978,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <TouchSlider
               value={currentTime}
+              label="Playback position"
               min={0}
               max={duration || 100}
               formatTooltip={(val) => formatTime(val)}

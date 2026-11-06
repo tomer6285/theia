@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../network/request';
 import { MediaItem, MediaType, Episode, SeasonInfo } from '../types';
 
 export class CinemetaClient {
@@ -17,12 +18,12 @@ export class CinemetaClient {
       typesToFetch.map(async (t) => {
         try {
           const url = `${this.baseUrl}/catalog/${t}/top/search=${encodeURIComponent(trimmed)}.json`;
-          const res = await fetch(url);
+          const res = await fetchWithTimeout(url, {}, undefined, 10000);
           if (!res.ok) return;
           const data = (await res.json()) as { metas?: any[] };
           if (data && Array.isArray(data.metas)) {
             for (const meta of data.metas) {
-              if (meta && meta.imdb_id) {
+              if (meta && (meta.imdb_id || meta.id)) {
                 results.push(this.formatMetaItem(meta, t));
               }
             }
@@ -33,7 +34,8 @@ export class CinemetaClient {
       })
     );
 
-    return results;
+    results.sort((a, b) => typesToFetch.indexOf(a.type) - typesToFetch.indexOf(b.type));
+    return Array.from(new Map(results.map((item) => [item.id, item])).values());
   }
 
   /**
@@ -41,8 +43,8 @@ export class CinemetaClient {
    */
   async getDetails(imdbId: string, type: MediaType): Promise<MediaItem | null> {
     try {
-      const url = `${this.baseUrl}/meta/${type}/${imdbId}.json`;
-      const res = await fetch(url);
+      const url = `${this.baseUrl}/meta/${type}/${encodeURIComponent(imdbId)}.json`;
+      const res = await fetchWithTimeout(url, {}, undefined, 10000);
       if (!res.ok) return null;
       const data = (await res.json()) as { meta?: any };
       if (!data || !data.meta) return null;
@@ -51,7 +53,10 @@ export class CinemetaClient {
 
       // If series, parse episodes and group by season
       if (type === 'series' && Array.isArray(data.meta.videos)) {
-        const episodes: Episode[] = data.meta.videos.map((v: any) => ({
+        const episodes: Episode[] = data.meta.videos.filter((v: any) => v &&
+          Number.isInteger(Number(v.season ?? 1)) && Number(v.season ?? 1) >= 0 &&
+          Number.isInteger(Number(v.episode ?? v.number)) && Number(v.episode ?? v.number) > 0
+        ).map((v: any) => ({
           id: v.id || `${imdbId}:${v.season}:${v.episode || v.number}`,
           title: v.title || v.name || `Episode ${v.episode || v.number}`,
           season: v.season !== undefined && v.season !== null ? Number(v.season) : 1,
@@ -117,7 +122,7 @@ export class CinemetaClient {
       const url = skip > 0
         ? `${this.baseUrl}/catalog/${type}/top/skip=${skip}.json`
         : `${this.baseUrl}/catalog/${type}/top.json`;
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url, {}, undefined, 10000);
       if (!res.ok) return [];
       const data = (await res.json()) as { metas?: any[] };
       if (data && Array.isArray(data.metas)) {

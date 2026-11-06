@@ -34,6 +34,7 @@ export const TouchPill: React.FC<TouchPillProps> = ({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={active}
       onPointerDown={() => setIsPressed(true)}
       onPointerUp={() => setIsPressed(false)}
       onPointerLeave={() => setIsPressed(false)}

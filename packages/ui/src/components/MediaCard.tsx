@@ -24,15 +24,26 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [isPressed, setIsPressed] = useState(false);
   const [isFavPressed, setIsFavPressed] = useState(false);
 
+  const [imageFailed, setImageFailed] = useState(false);
+  React.useEffect(() => setImageFailed(false), [media.poster, media.background]);
   const posterUrl =
     media.poster ||
     media.background ||
-    'https://via.placeholder.com/300x450/1c1c22/71717a?text=No+Poster';
+    '';
 
   const hasProgress = progress && progress.percentage > 2 && !progress.completed;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${media.title}`}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onPress(media);
+        }
+      }}
       onClick={() => onPress(media)}
       onPointerDown={() => setIsPressed(true)}
       onPointerUp={() => setIsPressed(false)}
@@ -63,17 +74,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           border: `1.5px solid ${colors.border.subtle}`,
         }}
       >
-        <img
-          src={posterUrl}
-          alt={media.title}
-          loading="lazy"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: 'block',
-          }}
-        />
+        {posterUrl && !imageFailed ? (
+          <img src={posterUrl} alt="" loading="lazy" decoding="async"
+            onError={() => setImageFailed(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        ) : (
+          <div style={{ height: '100%', display: 'grid', placeItems: 'center', padding: 20,
+            textAlign: 'center', color: colors.text.secondary,
+            background: 'linear-gradient(145deg, #222235, #121216)' }}>
+            <span>{media.title}</span>
+          </div>
+        )}
 
         {/* Rating Badge */}
         {media.rating && (
@@ -136,7 +147,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               transform: isFavPressed ? 'scale(0.85)' : 'scale(1)',
               touchAction: 'manipulation',
             }}
-            aria-label="Toggle favorite"
+            aria-label={`${isFavorite ? 'Remove' : 'Save'} ${media.title} ${isFavorite ? 'from' : 'to'} favorites`}
+            aria-pressed={isFavorite}
           >
             {isFavorite ? '♥' : '♡'}
           </button>

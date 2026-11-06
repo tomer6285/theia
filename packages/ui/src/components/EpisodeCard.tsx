@@ -44,7 +44,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
     episode.thumbnail ||
     media.background ||
     media.poster ||
-    'https://via.placeholder.com/320x180/1c1c22/71717a?text=Episode';
+    '';
 
   const handleCardClick = () => {
     if (onSelect) {
@@ -66,10 +66,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      className="episode-card"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
           handleCardClick();
         }
@@ -98,7 +99,6 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
           : 'none',
         cursor: 'pointer',
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        outline: 'none',
         userSelect: 'none',
         WebkitTapHighlightColor: 'transparent',
       }}
@@ -118,10 +118,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
         }}
       >
-        <img
+        {thumbUrl && <img
           src={thumbUrl}
           alt={episode.title}
           loading="lazy"
+          onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }}
           style={{
             width: '100%',
             height: '100%',
@@ -129,7 +130,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
             transform: isHovered ? 'scale(1.05)' : 'scale(1)',
             transition: 'transform 0.3s ease',
           }}
-        />
+        />}
 
         {/* Gradient shadow overlay */}
         <div

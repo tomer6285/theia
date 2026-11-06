@@ -1,3 +1,4 @@
+import { useModal } from '../useModal';
 import React from 'react';
 import { SubtitleTrack } from '@theia/core';
 import { colors } from '../theme/colors';
@@ -23,6 +24,7 @@ export const SubtitleStepper: React.FC<SubtitleStepperProps> = ({
   selectedTrackId,
   onSelectTrack,
 }) => {
+  const dialogRef = useModal(isOpen, onClose);
   if (!isOpen) return null;
 
   const adjust = (delta: number) => {
@@ -49,6 +51,11 @@ export const SubtitleStepper: React.FC<SubtitleStepperProps> = ({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Subtitle timing and tracks"
+        tabIndex={-1}
         style={{
           width: '100%',
           maxWidth: 460,
@@ -126,7 +133,7 @@ export const SubtitleStepper: React.FC<SubtitleStepperProps> = ({
         </div>
 
         {/* Large Touch Stepper Buttons */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
           <button
             type="button"
             onClick={() => adjust(-250)}
@@ -177,6 +184,7 @@ export const SubtitleStepper: React.FC<SubtitleStepperProps> = ({
           </div>
           <TouchSlider
             value={offsetMs}
+            label="Subtitle delay in milliseconds"
             min={-5000}
             max={5000}
             step={50}
@@ -224,7 +232,7 @@ export const SubtitleStepper: React.FC<SubtitleStepperProps> = ({
 };
 
 const stepperButtonStyle: React.CSSProperties = {
-  flex: 1,
+  flex: '1 0 64px',
   height: 48,
   borderRadius: 14,
   backgroundColor: colors.bg.elevated,

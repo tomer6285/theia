@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { colors } from '../theme/colors';
 
 export interface SearchBarProps {
@@ -21,13 +21,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [query, setQuery] = useState(initialValue);
   const [isFocused, setIsFocused] = useState(false);
 
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
+  useEffect(() => { setQuery(initialValue); }, [initialValue]);
   useEffect(() => {
     const timer = setTimeout(() => {
-      onSearch(query);
+      onSearchRef.current(query);
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [query, debounceMs, onSearch]);
+  }, [query, debounceMs]);
 
   return (
     <div
@@ -62,7 +65,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       </span>
 
       <input
-        type="text"
+        type="search"
+        aria-label={placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => {
@@ -76,6 +80,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         placeholder={placeholder}
         style={{
           flex: 1,
+          minWidth: 0,
           height: '100%',
           background: 'transparent',
           border: 'none',

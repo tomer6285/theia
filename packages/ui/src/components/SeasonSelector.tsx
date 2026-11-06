@@ -242,6 +242,7 @@ export const SeasonSelector: React.FC<SeasonSelectorProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={placeholder}
+              aria-label={placeholder}
               style={{
                 width: '100%',
                 height: 40,

@@ -1,3 +1,4 @@
+import { fetchProviderResponse } from '../network/request';
 import { IProvider, ProviderQuery, StreamSource } from '../types';
 
 export class VixSrcProvider implements IProvider {
@@ -8,6 +9,7 @@ export class VixSrcProvider implements IProvider {
 
   async resolveStreams(query: ProviderQuery): Promise<StreamSource[]> {
     const streams: StreamSource[] = [];
+    if (query.type === 'series' && (query.season === undefined || query.episode === undefined)) return streams;
     if (query.signal?.aborted) return streams;
 
     const mediaId = query.imdbId || query.tmdbId;
@@ -24,22 +26,14 @@ export class VixSrcProvider implements IProvider {
       : `${this.baseUrl}/api/movie/${mediaId}`;
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-      if (query.signal) {
-        query.signal.addEventListener('abort', () => controller.abort(), { once: true });
-      }
-
-      const apiRes = await fetch(apiEndpoint, {
-        signal: controller.signal,
+      const apiRes = await fetchProviderResponse(apiEndpoint, {
         headers: {
           'Referer': embedUrl,
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
-      });
-      clearTimeout(timeoutId);
+      }, query.signal);
 
       if (apiRes.ok) {
         const data = await apiRes.json();

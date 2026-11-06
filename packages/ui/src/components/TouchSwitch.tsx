@@ -17,13 +17,23 @@ export const TouchSwitch: React.FC<TouchSwitchProps> = ({
   description,
 }) => {
   return (
-    <div
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label || 'Toggle setting'}
+      disabled={disabled}
       onClick={() => {
         if (!disabled) {
           onChange(!checked);
         }
       }}
       style={{
+        width: '100%',
+        background: 'none',
+        border: 0,
+        font: 'inherit',
+        textAlign: 'left',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -79,6 +89,6 @@ export const TouchSwitch: React.FC<TouchSwitchProps> = ({
           }}
         />
       </div>
-    </div>
+    </button>
   );
 };

@@ -12,38 +12,20 @@ export class DefaultStorageAdapter implements StorageAdapter {
   private mem: Record<string, string> = {};
 
   getItem(name: string): string | null {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        return localStorage.getItem(name);
-      } catch {
-        // fallback
-      }
-    }
-    return this.mem[name] || null;
+    try {
+      if (typeof localStorage !== 'undefined') return localStorage.getItem(name) ?? this.mem[name] ?? null;
+    } catch { /* Private browsing or denied storage: retain the in-memory session. */ }
+    return this.mem[name] ?? null;
   }
 
   setItem(name: string, value: string): void {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(name, value);
-        return;
-      } catch {
-        // fallback
-      }
-    }
     this.mem[name] = value;
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem(name, value); } catch { /* use memory */ }
   }
 
   removeItem(name: string): void {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.removeItem(name);
-        return;
-      } catch {
-        // fallback
-      }
-    }
     delete this.mem[name];
+    try { if (typeof localStorage !== 'undefined') localStorage.removeItem(name); } catch { /* use memory */ }
   }
 }
 
@@ -73,7 +55,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   preferredLanguages: ['en', 'es', 'fr', 'de'],
   preferredSubtitles: ['en'],
   serverPriority: ['vidlink', 'vixsrc', 'vidora'],
-  proxyUrl: '/api/proxy',
+  proxyUrl: '',
   autoPlayNext: true,
   autoResume: true,
   subtitleOffset: 0,
@@ -84,21 +66,84 @@ let currentAdapter: StorageAdapter = new DefaultStorageAdapter();
 const STORAGE_KEY = 'theia_store';
 const LEGACY_STORAGE_KEY = 'dion_tc_store';
 
-export function setStorageAdapter(adapter: StorageAdapter) {
-  currentAdapter = adapter;
+type PersistedState = Pick<WatchState, 'progress' | 'history' | 'favorites' | 'subtitleOffsets' | 'settings'>;
+const isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const isMedia = (value: unknown): value is MediaItem =>
+  isRecord(value) && typeof value.id === 'string' && typeof value.title === 'string'
+  && (value.type === 'movie' || value.type === 'series');
+const isProgress = (value: unknown): value is WatchProgress =>
+  isRecord(value) && typeof value.mediaId === 'string'
+  && (value.episodeId === undefined || typeof value.episodeId === 'string')
+  && ['positionSeconds', 'durationSeconds', 'percentage', 'updatedAt'].every(
+    (key) => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0
+  ) && typeof value.completed === 'boolean';
+
+function parseStoredState(raw: unknown): Partial<PersistedState> {
+  if (typeof raw !== 'string') return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return {};
+    const settings = { ...DEFAULT_SETTINGS };
+    if (isRecord(parsed.settings)) {
+      for (const key of ['autoPlayNext', 'autoResume'] as const) {
+        if (typeof parsed.settings[key] === 'boolean') settings[key] = parsed.settings[key];
+      }
+      for (const key of ['preferredLanguages', 'preferredSubtitles', 'serverPriority'] as const) {
+        if (Array.isArray(parsed.settings[key]) && parsed.settings[key].every((v: unknown) => typeof v === 'string')) {
+          settings[key] = parsed.settings[key];
+        }
+      }
+      if (typeof parsed.settings.proxyUrl === 'string') settings.proxyUrl = parsed.settings.proxyUrl;
+      if (Number.isFinite(parsed.settings.subtitleOffset)) settings.subtitleOffset = parsed.settings.subtitleOffset;
+      if (['fit', 'fill', '16:9'].includes(parsed.settings.aspectRatio)) settings.aspectRatio = parsed.settings.aspectRatio;
+      if (['native', 'hls'].includes(parsed.settings.defaultPlayer)) settings.defaultPlayer = parsed.settings.defaultPlayer;
+    }
+    return {
+      settings,
+      progress: isRecord(parsed.progress)
+        ? Object.fromEntries(Object.entries(parsed.progress).filter(([, value]) => isProgress(value))) : {},
+      history: Array.isArray(parsed.history) ? parsed.history.filter((h) =>
+        isRecord(h) && isMedia(h.media) && isProgress(h.progress) && Number.isFinite(h.lastWatchedAt)
+      ).sort((a, b) => b.lastWatchedAt - a.lastWatchedAt).slice(0, 50) : [],
+      favorites: Array.isArray(parsed.favorites) ? parsed.favorites.filter(isMedia) : [],
+      subtitleOffsets: isRecord(parsed.subtitleOffsets)
+        ? Object.fromEntries(Object.entries(parsed.subtitleOffsets).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) : {},
+    };
+  } catch {
+    return {};
+  }
 }
 
-export function loadStoredState(): Partial<WatchState> {
+/** Install and hydrate an asynchronous adapter before mounting the application. */
+export async function setStorageAdapter(adapter: StorageAdapter): Promise<void> {
+  currentAdapter = adapter;
   try {
-    const raw = currentAdapter.getItem(STORAGE_KEY) || currentAdapter.getItem(LEGACY_STORAGE_KEY);
-    if (raw && typeof raw === 'string') {
-      return JSON.parse(raw);
-    }
+    const raw = await adapter.getItem(STORAGE_KEY) ?? await adapter.getItem(LEGACY_STORAGE_KEY);
+    if (adapter === currentAdapter) theiaStore.setState({
+      progress: {}, history: [], favorites: [], subtitleOffsets: {}, settings: { ...DEFAULT_SETTINGS },
+      ...parseStoredState(raw),
+    });
   } catch (err) {
     console.error('Failed to load stored state:', err);
   }
-  return {};
 }
+
+export function loadStoredState(): Partial<PersistedState> {
+  try {
+    const raw = currentAdapter.getItem(STORAGE_KEY);
+    if (raw instanceof Promise) {
+      // Async storage is hydrated by setStorageAdapter, never parsed synchronously.
+      void raw.catch(() => {});
+      return {};
+    }
+    return parseStoredState(raw ?? currentAdapter.getItem(LEGACY_STORAGE_KEY));
+  } catch {
+    return {};
+  }
+}
+
+let pendingWrite: Promise<void> | null = null;
 
 export function saveState(state: {
   progress: Record<string, WatchProgress>;
@@ -108,16 +153,24 @@ export function saveState(state: {
   settings: UserSettings;
 }) {
   try {
-    currentAdapter.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
+    const adapter = currentAdapter;
+    const serialized = JSON.stringify({
         progress: state.progress,
         history: state.history,
         favorites: state.favorites,
         subtitleOffsets: state.subtitleOffsets,
         settings: state.settings,
-      })
-    );
+      });
+    // Keep browser writes synchronous (including pagehide), but serialize async adapters.
+    const result = pendingWrite
+      ? pendingWrite.then(() => adapter.setItem(STORAGE_KEY, serialized))
+      : adapter.setItem(STORAGE_KEY, serialized);
+    if (result instanceof Promise) {
+      const tracked: Promise<void> = result.catch((err) => {
+        console.error('Failed to save state:', err);
+      }).finally(() => { if (pendingWrite === tracked) pendingWrite = null; });
+      pendingWrite = tracked;
+    }
   } catch (err) {
     console.error('Failed to save state:', err);
   }
@@ -133,6 +186,9 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
   settings: { ...DEFAULT_SETTINGS, ...initialSaved.settings },
 
   updateProgress: (progress: WatchProgress, media?: MediaItem) => {
+    if (!isProgress(progress) || progress.durationSeconds <= 0) return;
+    const positionSeconds = Math.min(progress.positionSeconds, progress.durationSeconds);
+    progress = { ...progress, positionSeconds, percentage: positionSeconds / progress.durationSeconds * 100 };
     set((state) => {
       const key = progress.episodeId || progress.mediaId;
       const updatedProgress = { ...state.progress, [key]: progress };
@@ -141,7 +197,7 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
       const existingIdx = newHistory.findIndex((h) =>
         progress.episodeId
           ? h.progress.episodeId === progress.episodeId
-          : h.media.id === progress.mediaId
+          : h.media.id === progress.mediaId && !h.progress.episodeId
       );
 
       const mediaToStore = media || newHistory[existingIdx]?.media;
@@ -153,7 +209,8 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
         };
 
         if (existingIdx >= 0) {
-          newHistory[existingIdx] = historyItem;
+          newHistory.splice(existingIdx, 1);
+          newHistory.unshift(historyItem);
         } else {
           newHistory.unshift(historyItem);
         }
@@ -183,7 +240,8 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
   getProgress: (mediaId: string, episodeId?: string) => {
     const state = get();
     const key = episodeId || mediaId;
-    return state.progress[key];
+    return state.progress[key] ?? (!episodeId
+      ? state.history.find((h) => h.media.id === mediaId)?.progress : undefined);
   },
 
   toggleFavorite: (media: MediaItem) => {
@@ -210,6 +268,7 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
   },
 
   setSubtitleOffset: (mediaId: string, offsetMs: number) => {
+    if (!Number.isFinite(offsetMs)) return;
     set((state) => {
       const newOffsets = { ...state.subtitleOffsets, [mediaId]: offsetMs };
       saveState({
