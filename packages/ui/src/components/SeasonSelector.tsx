@@ -180,7 +180,7 @@ export const SeasonSelector: React.FC<SeasonSelectorProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease',
+                      transition: 'background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease',
                       textAlign: 'left',
                     }}
                     onMouseEnter={(e) => {
@@ -333,7 +333,7 @@ export const SeasonSelector: React.FC<SeasonSelectorProps> = ({
                     : 'rgba(28, 28, 34, 0.7)',
                   border: isSelected
                     ? `1.5px solid ${colors.accent.primary}`
-                    : `1px solid ${colors.border.subtle}`,
+                    : `1.5px solid ${colors.border.subtle}`,
                   color: isSelected ? '#000' : colors.text.secondary,
                   fontSize: '12.5px',
                   fontWeight: 700,
@@ -342,7 +342,7 @@ export const SeasonSelector: React.FC<SeasonSelectorProps> = ({
                   alignItems: 'center',
                   gap: 6,
                   boxShadow: isSelected ? `0 0 14px ${colors.accent.primary}55` : 'none',
-                  transition: 'all 0.15s ease',
+                  transition: 'background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease',
                   userSelect: 'none',
                 }}
               >
