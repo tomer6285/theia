@@ -24,7 +24,7 @@ pnpm build
 pnpm --filter @theia/web dev
 ```
 
-The web app runs at `http://localhost:3000`. Shared packages build before their dependents. `pnpm build` compiles the shared packages, Worker, web app, and Electron wrapper; it does not create an Android APK or desktop installer.
+The web app runs at `http://localhost:3000` and listens on all network interfaces, so other devices can use `http://<this-machine-lan-ip>:3000`. Shared packages build before their dependents. `pnpm build` compiles the shared packages, Worker, web app, and Electron wrapper; it does not create an Android APK or desktop installer.
 
 ```bash
 pnpm test       # Core, proxy, player, UI, app-flow and dependency compatibility tests
