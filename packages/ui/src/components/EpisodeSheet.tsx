@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { MediaItem, Episode, SeasonInfo, WatchProgress } from '@theia/core';
 import { colors } from '../theme/colors';
 import { EpisodeCard } from './EpisodeCard';
@@ -28,6 +29,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
     return seasons.find((s) => s.season === 1)?.season ?? seasons[0]?.season ?? 1;
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const episodeListRef = useRef<HTMLDivElement>(null);
   const activeEpisodeRef = useRef<HTMLDivElement>(null);
 
   // Swipe-down to dismiss gesture state
@@ -35,33 +37,35 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const startYRef = useRef(0);
 
-  // Sync selectedSeason if currentEpisodeId changes or media opens
-  useEffect(() => {
-    if (currentEpisodeId && seasons.length > 0) {
-      for (const s of seasons) {
-        if (s.episodes.some((e) => e.id === currentEpisodeId)) {
-          setSelectedSeason(s.season);
-          break;
-        }
-      }
-    }
-  }, [currentEpisodeId, isOpen]);
-
-  useEffect(() => {
-    if (isOpen && activeEpisodeRef.current) {
-      activeEpisodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [isOpen, selectedSeason]);
-
-  // Sync selectedSeason if media changes
-  useEffect(() => {
-    if (seasons.length > 0) {
-      const initialSeason = seasons.find((s) => s.season === 1)?.season ?? seasons[0]?.season ?? 1;
-      setSelectedSeason(initialSeason);
-    }
+  // Initialize before paint so reopening never flashes the previous season or filter.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const initialSeason = seasons.find((s) =>
+      s.episodes.some((ep) => ep.id === currentEpisodeId)
+    )?.season ?? seasons.find((s) => s.season === 1)?.season ?? seasons[0]?.season ?? 1;
+    setSelectedSeason(initialSeason);
     setDragY(0);
+    setIsDragging(false);
     setSearchQuery('');
-  }, [media.id]);
+  }, [isOpen, media.id, currentEpisodeId]);
+
+  // Scroll only this list. scrollIntoView also scrolls modal/page ancestors.
+  useLayoutEffect(() => {
+    const list = episodeListRef.current;
+    if (!isOpen || !list) return;
+    const active = activeEpisodeRef.current;
+    list.scrollTop = active
+      ? Math.max(0, active.getBoundingClientRect().top - list.getBoundingClientRect().top
+          + list.scrollTop - (list.clientHeight - active.clientHeight) / 2)
+      : 0;
+  }, [isOpen, selectedSeason, media.id, currentEpisodeId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isOpen]);
 
   const currentSeasonInfo = seasons.find((s) => s.season === selectedSeason) || seasons[0];
   const allSeasonEpisodes = currentSeasonInfo?.episodes || media.episodes || [];
@@ -108,20 +112,22 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 999,
         backgroundColor: `rgba(0,0,0,${Math.max(0.3, 0.85 - dragY / 400)})`,
-        backdropFilter: 'blur(14px)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
         animation: 'fadeIn 0.2s ease-out',
       }}
-      onClick={onClose}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClose();
+      }}
     >
       <div
         style={{
@@ -129,7 +135,8 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
           borderTopLeftRadius: 28,
           borderTopRightRadius: 28,
           borderTop: `1.5px solid ${colors.border.subtle}`,
-          maxHeight: '90vh',
+          height: '90dvh',
+          maxHeight: '90%',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 -15px 50px rgba(0,0,0,0.9)',
@@ -235,8 +242,11 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
 
         {/* Episodes List */}
         <div
+          ref={episodeListRef}
           style={{
             flex: 1,
+            minHeight: 0,
+            overscrollBehavior: 'contain',
             overflowY: 'auto',
             padding: '16px 24px 36px 24px',
             display: 'flex',
@@ -306,6 +316,7 @@ export const EpisodeSheet: React.FC<EpisodeSheetProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
