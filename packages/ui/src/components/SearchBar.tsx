@@ -65,6 +65,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       </span>
 
       <input
+        className="theia-search-input"
         type="search"
         aria-label={placeholder}
         value={query}

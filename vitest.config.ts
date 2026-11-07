@@ -10,5 +10,5 @@ export default defineConfig({
     },
     dedupe: ['react', 'react-dom'],
   },
-  test: { include: ['packages/*/test/**/*.test.{ts,tsx}', 'services/*/test/**/*.test.ts', 'apps/web/test/**/*.test.tsx'], restoreMocks: true },
+  test: { include: ['packages/*/test/**/*.test.{ts,tsx}', 'services/*/test/**/*.test.ts', 'apps/web/test/**/*.test.tsx', 'apps/electron/test/**/*.test.ts'], restoreMocks: true },
 });

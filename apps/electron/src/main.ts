@@ -1,13 +1,16 @@
 import { pathToFileURL } from 'url';
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, dialog, session } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import { startDesktopProxy } from './proxy';
 
 let mainWindow: BrowserWindow | null = null;
+let desktopProxy: Awaited<ReturnType<typeof startDesktopProxy>>;
 
 function resolveWebIndexPath(): string {
   const candidates = [
     path.join(process.resourcesPath, 'web/index.html'),
+    path.join(app.getAppPath(), '../web/dist/index.html'),
     path.join(__dirname, '../../web/dist/index.html'),
     path.join(__dirname, '../web/dist/index.html'),
     path.join(app.getAppPath(), 'web/dist/index.html'),
@@ -37,6 +40,7 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: true,
       sandbox: true,
+      additionalArguments: [`--theia-proxy=${desktopProxy.url}`],
     },
   });
 
@@ -91,7 +95,8 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  desktopProxy = await startDesktopProxy();
   createWindow();
 
   app.on('activate', () => {
@@ -99,7 +104,12 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+}).catch((error) => {
+  dialog.showErrorBox('Theia could not start', `Could not start the desktop app: ${error.message}`);
+  app.quit();
 });
+
+app.on('before-quit', () => desktopProxy?.close());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
