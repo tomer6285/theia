@@ -1,7 +1,8 @@
+import { useVideoSubtitles } from './useVideoSubtitles';
 import { preferredTrackIndex } from './languages';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
-import { theiaStore, offsetSubtitlesVTT, proxyResourceUrl } from '@theia/core';
+import { theiaStore, proxyResourceUrl } from '@theia/core';
 import { colors, TouchSlider, SubtitleStepper, TouchPill } from '@theia/ui';
 import { VideoPlayerProps, AspectRatioMode } from './types';
 import { GestureCoordinator } from './gestures/coordinator';
@@ -51,7 +52,6 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 
   // Subtitle Stepper modal state
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
-  const [selectedSubId, setSelectedSubId] = useState<string>('');
   const [subtitleOffsetMs, setSubtitleOffsetMs] = useState(0);
 
   // Stream selector dropdown
@@ -62,8 +62,6 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [subtitleUrl, setSubtitleUrl] = useState('');
-  const [subtitleError, setSubtitleError] = useState<string | null>(null);
   const mediaKey = episode?.id || media.id;
   const lastPosition = useRef<{ key: string; time: number } | null>(null);
   const requestedTime = useRef(0);
@@ -126,7 +124,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       hls = new Hls({ enableWorker: true, backBufferLength: 30, maxBufferLength: 30,
         startPosition: requestedTime.current || -1 });
       hlsRef.current = hls;
-      // Provider defaults can select a different language and forced captions.
+      // The subtitle controller enables captions after choosing the preferred language.
       hls.subtitleDisplay = false;
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
         setAudioTracks(data.audioTracks.map((track, index) => ({ id: index, label: track.name || track.lang || `Track ${index + 1}` })));
@@ -169,34 +167,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     };
   }, [saveProgress]);
 
-  useEffect(() => {
-    const preferred = theiaStore.getState().settings.preferredSubtitles;
-    setSelectedSubId(stream.subtitles?.find((track) => track.isDefault)?.id
-      || stream.subtitles?.find((track) => preferred.includes(track.language))?.id || '');
-  }, [stream.id, stream.url]);
-
-  useEffect(() => {
-    setSubtitleUrl('');
-    setSubtitleError(null);
-    const track = stream.subtitles?.find((sub) => sub.id === selectedSubId);
-    if (!track || stream.format === 'embed') return;
-    const controller = new AbortController();
-    let objectUrl: string | undefined;
-    async function load() {
-      try {
-        const response = await fetch(track!.url, { signal: controller.signal });
-        if (!response.ok) throw new Error('Subtitle unavailable');
-        const content = await response.text();
-        if (controller.signal.aborted) return;
-        objectUrl = URL.createObjectURL(new Blob([offsetSubtitlesVTT(content, subtitleOffsetMs)], { type: 'text/vtt' }));
-        setSubtitleUrl(objectUrl);
-      } catch {
-        if (!controller.signal.aborted) setSubtitleError('Subtitles could not be loaded. Try another track.');
-      }
-    }
-    void load();
-    return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [selectedSubId, subtitleOffsetMs, stream.url, stream.format]);
+  const subtitles = useVideoSubtitles({ videoRef, hlsRef, stream,
+    sessionKey: `${mediaKey}:${stream.id}:${stream.url}:${retryCount}`, offsetMs: subtitleOffsetMs });
 
   useEffect(() => {
     if (!isPlaying || !isHUDVisible || isSubModalOpen || isStreamSelectorOpen) return;
@@ -429,8 +401,10 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           onWaiting={() => setIsBuffering(true)}
           onPlaying={() => { setIsBuffering(false); setPlaybackError(null); }}
         >
-          {subtitleUrl && <track key={subtitleUrl} kind="subtitles" src={subtitleUrl}
-            label="Selected subtitles" default onLoad={(event) => { event.currentTarget.track.mode = 'showing'; }} />}
+          {subtitles.url && <track key={subtitles.url} kind="subtitles" src={subtitles.url}
+            data-theia-subtitles={subtitles.selectedId}
+            label={subtitles.tracks.find((track) => track.id === subtitles.selectedId)?.label || 'Selected subtitles'}
+            default onLoad={(event) => subtitles.onExternalLoad(event.currentTarget)} />}
         </video>
       )}
 
@@ -445,8 +419,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           {onBack && <TouchPill label="Back" onClick={onBack} />}
         </div>
       )}
-      {subtitleError && <div role="status" style={{ position: 'absolute', bottom: 120, zIndex: 55,
-        padding: 12, borderRadius: 12, background: '#18181b', color: '#fff' }}>{subtitleError}</div>}
+      {subtitles.error && <div role="status" style={{ position: 'absolute', bottom: 120, zIndex: 55,
+        padding: 12, borderRadius: 12, background: '#18181b', color: '#fff' }}>{subtitles.error}</div>}
       {/* Buffering Spinner */}
       {isBuffering && stream.format !== 'embed' && (
         <div
@@ -1044,9 +1018,9 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           setSubtitleOffsetMs(offset);
           theiaStore.getState().setSubtitleOffset(media.id, offset);
         }}
-        tracks={stream.subtitles}
-        selectedTrackId={selectedSubId}
-        onSelectTrack={(id) => setSelectedSubId(id)}
+        tracks={subtitles.tracks}
+        selectedTrackId={subtitles.selectedId}
+        onSelectTrack={subtitles.select}
       />
     </div>
   );

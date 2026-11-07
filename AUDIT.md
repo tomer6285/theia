@@ -96,3 +96,12 @@ A live playback report exposed gaps that the initial mocked tests did not cover:
 - Added regressions for automatic LAN routing, short-lived-token handling, unavailable sources, signed playlist extraction, HLS recovery limits, and audio selection.
 
 Live isolated Chromium checks against `http://10.142.1.205:3000` verified direct movie and series playback, positive decoded video dimensions/frame counts, advancing time, and English audio selection. The shared T3 preview browser was unavailable because of host AppArmor restrictions, so these checks used a separate test browser with an isolated profile. External provider availability remains outside the app's control.
+
+
+## Automatic subtitle follow-up
+
+The direct HLS playback path initially hid captions and did not connect manifest subtitle tracks to the picker. It now discovers and automatically enables full subtitles in the preferred language, prioritizing those over forced-only captions and unrelated provider defaults. The same picker handles manifest, native-browser, and external SRT/VTT tracks. External subtitle requests use the configured/same-origin proxy. Language and Off choices persist across episodes. Native-browser here refers to Safari/HTML video playback, not the separate Android Expo AV component.
+
+Timing offsets apply to newly loaded HLS cues and existing cues using their original timestamps, preventing cumulative drift. Caption listeners and Blob URLs are cleaned up on source changes. Regression coverage includes automatic language matching, HLS default-selection races, manual Off across rendition changes, stream switching, native browser tracks, external routing, and late-arriving cues.
+
+An isolated Chromium playback check verified loaded/active English captions for Inception and Breaking Bad, the picker, Off/re-enable, a +250ms adjustment/reset, and automatic captions on the next episode. No page errors occurred. Workspace tests, type checks, and builds passed. The temporary development server was stopped after verification, honoring the earlier stop request.

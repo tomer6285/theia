@@ -2,7 +2,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
-import { theiaStore } from '@theia/core';
+import { theiaStore, setDefaultProxyUrl } from '@theia/core';
 import { VideoPlayerWeb } from '../src/VideoPlayer.web';
 import type { MediaItem, StreamSource } from '@theia/core';
 vi.mock('hls.js', () => ({ default: { isSupported: () => false } }));
@@ -14,13 +14,14 @@ const setupVideo = (video: HTMLVideoElement, time = 0) => {
   fireEvent.loadedMetadata(video);
 };
 beforeEach(() => {
+  setDefaultProxyUrl('');
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   theiaStore.setState({ progress: {}, history: [] });
-  theiaStore.getState().updateSettings({ autoResume: true, autoPlayNext: true, proxyUrl: '' });
+  theiaStore.getState().updateSettings({ autoResume: true, autoPlayNext: true, proxyUrl: '', preferredSubtitles: ['en'] });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); setDefaultProxyUrl(''); vi.unstubAllGlobals(); });
 
 describe('web playback', () => {
   it('applies saved resume time after metadata and saves the final time on exit', () => {
@@ -81,4 +82,44 @@ describe('web playback', () => {
     fireEvent.ended(video);
     expect(next).toHaveBeenCalledTimes(1);
   });
+});
+
+it('automatically chooses a preferred external track over an unrelated provider default and uses the proxy', async () => {
+  setDefaultProxyUrl('/api/proxy');
+  const request = vi.fn().mockResolvedValue(new Response('1\n00:00:01,000 --> 00:00:02,000\nHello'));
+  vi.stubGlobal('fetch', request);
+  URL.createObjectURL = vi.fn().mockReturnValue('blob:english');
+  URL.revokeObjectURL = vi.fn();
+  const { container } = render(<VideoPlayerWeb media={media} stream={{ ...stream,
+    headers: { Referer: 'https://provider.example/' }, subtitles: [
+      { id: 'it', language: 'ita', label: 'Italian', isDefault: true, url: 'https://cdn.example/it.srt', format: 'srt' },
+      { id: 'en', language: 'eng', label: 'English', url: 'https://cdn.example/en.srt', format: 'srt' },
+    ] }} />);
+  await waitFor(() => expect(container.querySelector('track')?.getAttribute('src')).toBe('blob:english'));
+  const url = new URL(request.mock.calls[0][0]);
+  expect(url.pathname).toBe('/api/proxy');
+  expect(url.searchParams.get('url')).toBe('https://cdn.example/en.srt');
+  expect(url.searchParams.get('referer')).toBe('https://provider.example/');
+});
+
+it('enables captions automatically when native HLS text tracks appear', () => {
+  const { container } = render(<VideoPlayerWeb media={media} stream={{ ...stream, format: 'hls' }} />);
+  const video = container.querySelector('video')!;
+  const italian = { kind: 'subtitles', language: 'ita', label: 'Italian', mode: 'disabled', cues: [] };
+  const english = { kind: 'subtitles', language: 'eng', label: 'English', mode: 'disabled', cues: [] };
+  Object.defineProperty(video, 'textTracks', { configurable: true, value: [italian, english] });
+  setupVideo(video);
+  expect(english.mode).toBe('showing');
+  expect(italian.mode).toBe('disabled');
+});
+
+it('respects an explicit automatic-subtitles Off preference for external tracks', () => {
+  theiaStore.getState().updateSettings({ preferredSubtitles: [] });
+  const request = vi.fn();
+  vi.stubGlobal('fetch', request);
+  const { container } = render(<VideoPlayerWeb media={media} stream={{ ...stream, subtitles: [
+    { id: 'en', language: 'eng', label: 'English', isDefault: true, url: 'https://cdn.example/en.vtt', format: 'vtt' },
+  ] }} />);
+  expect(request).not.toHaveBeenCalled();
+  expect(container.querySelector('track')).toBeNull();
 });
