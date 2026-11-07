@@ -193,7 +193,10 @@ export const SubtitleStepper: React.FC<SubtitleStepperProps> = ({
           />
         </div>
 
-        {/* Subtitle Track Picker (if tracks exist) */}
+        {tracks.length === 0 && <p role="status" style={{ color: colors.text.secondary, lineHeight: 1.5 }}>
+          No subtitle tracks are available for this source.
+        </p>}
+        {/* Subtitle Track Picker */}
         {tracks.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontSize: '13px', fontWeight: 700, color: colors.text.secondary }}>

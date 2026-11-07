@@ -69,7 +69,7 @@ Direct streams use Expo AV with native controls, saved resume positions, request
 
 ## Playback behavior and limits
 
-Web playback supports timeline/keyboard seeking, brightness and volume gestures, a control lock, server switching, HLS audio language selection, and external SRT/WebVTT subtitle tracks with timing adjustments. VixSrc discovery consumes its short-lived embed token immediately and extracts a signed HLS playlist for the built-in player; it does not load a sandbox-incompatible iframe. Preferences control resume and automatic next-episode playback. Next episodes resolve fresh streams.
+Web playback supports timeline/keyboard seeking, brightness and volume gestures, a control lock, server switching, HLS audio language selection, and automatic subtitles with timing adjustments. The web player chooses full captions in your preferred language (English by default), discovers HLS/native-browser and external SRT/WebVTT tracks, and remembers explicit language/Off choices for subsequent episodes. VixSrc discovery consumes its short-lived embed token immediately and extracts a signed HLS playlist for the built-in player; it does not load a sandbox-incompatible iframe. Preferences control resume and automatic next-episode playback. Next episodes resolve fresh streams.
 
 Third-party embeds manage their own playback, captions, and progress. Theia cannot inspect their cross-origin playback state, so external embeds do not provide Theia watch-progress tracking or reliable automatic next-episode playback. Native external subtitle synchronization and the custom web gesture HUD are not implemented. Provider availability depends on external services and is not guaranteed by the local tests.
 
