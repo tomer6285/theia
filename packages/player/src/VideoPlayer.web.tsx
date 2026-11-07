@@ -3,8 +3,9 @@ import { preferredTrackIndex } from './languages';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
 import { theiaStore, proxyResourceUrl } from '@theia/core';
-import { colors, TouchSlider, SubtitleStepper, TouchPill } from '@theia/ui';
+import { colors, TouchSlider, SubtitleStepper } from '@theia/ui';
 import { VideoPlayerProps, AspectRatioMode } from './types';
+import { playerStyles, PlayerIcon } from './playerChrome';
 import { GestureCoordinator } from './gestures/coordinator';
 
 export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
@@ -32,6 +33,16 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Player state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const update = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
+  }, []);
+  const toggleFullscreen = () => {
+    const action = document.fullscreenElement ? document.exitFullscreen() : containerRef.current?.requestFullscreen?.();
+    void action?.catch(() => {});
+  };
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -41,8 +52,12 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   const [isLocked, setIsLocked] = useState(false);
   const [showLockNotice, setShowLockNotice] = useState(false);
   const [isHUDVisible, setIsHUDVisible] = useState(true);
+  const [hudActivity, setHudActivity] = useState(0);
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
+  const lastMouseActivity = useRef(0);
   const [brightness, setBrightness] = useState(100);
   const [volume, setVolume] = useState(100);
+  const previousVolume = useRef(100);
   const [showBrightness, setShowBrightness] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
   const [scrubOffset, setScrubOffset] = useState<number | null>(null);
@@ -56,6 +71,13 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 
   // Stream selector dropdown
   const [isStreamSelectorOpen, setIsStreamSelectorOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isStreamSelectorOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    containerRef.current?.querySelector<HTMLButtonElement>('.player-servers button')?.focus();
+    return () => { if (previousFocus?.isConnected) previousFocus.focus(); };
+  }, [isStreamSelectorOpen]);
 
   // Auto-next episode countdown banner (last 30s)
   const [showNextOverlay, setShowNextOverlay] = useState(false);
@@ -171,10 +193,10 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     sessionKey: `${mediaKey}:${stream.id}:${stream.url}:${retryCount}`, offsetMs: subtitleOffsetMs });
 
   useEffect(() => {
-    if (!isPlaying || !isHUDVisible || isSubModalOpen || isStreamSelectorOpen) return;
+    if (!isPlaying || !isHUDVisible || isSubModalOpen || isStreamSelectorOpen || keyboardFocus) return;
     const timer = setTimeout(() => setIsHUDVisible(false), 4000);
     return () => clearTimeout(timer);
-  }, [isPlaying, isHUDVisible, isSubModalOpen, isStreamSelectorOpen, currentTime === 0]);
+  }, [isPlaying, isHUDVisible, isSubModalOpen, isStreamSelectorOpen, keyboardFocus, hudActivity, currentTime === 0]);
 
   const handleCycleAspect = () => {
     setAspectRatio((current) => {
@@ -278,6 +300,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       role="region"
       aria-label={`${media.title} player`}
       tabIndex={0}
+      onFocusCapture={(event) => {
+        if ((event.target as HTMLElement).matches(':focus-visible')) {
+          setKeyboardFocus(true); setIsHUDVisible(true);
+        }
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setKeyboardFocus(false);
+      }}
+      onKeyDownCapture={() => { if (!isLocked) setIsHUDVisible(true); }}
       onKeyDown={(event) => {
         if ((event.target as HTMLElement).closest('button, input, select, [role="slider"], [role="dialog"]')) return;
         if (event.key === 'Escape') { onBack?.(); return; }
@@ -303,6 +334,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         touchAction: 'none',
       }}
       onPointerDown={(e) => {
+        setKeyboardFocus(false);
         if ((e.target as HTMLElement).closest('button, input, select, [role="slider"], [role="dialog"]')) return;
         if (!e.isPrimary || e.button !== 0) return;
         e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -321,6 +353,10 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         }
       }}
       onPointerMove={(e) => {
+        if (e.pointerType === 'mouse' && !isLocked && Date.now() - lastMouseActivity.current > 250) {
+          lastMouseActivity.current = Date.now();
+          setIsHUDVisible(true); setHudActivity((value) => value + 1);
+        }
         if (!isLocked && containerRef.current) {
           coordinatorRef.current?.handlePointerMove(
             e,
@@ -409,41 +445,25 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       )}
 
       {playbackError && (
-        <div role="alert" style={{ position: 'absolute', zIndex: 60, maxWidth: 380, margin: 20,
-          padding: 24, borderRadius: 20, background: '#18181b', color: '#fff', textAlign: 'center' }}>
-          <p style={{ marginBottom: 16 }}>{playbackError}</p>
-          <TouchPill label="Retry stream" onClick={() => setRetryCount((count) => count + 1)} />
-          {availableStreams.length > 1 && <TouchPill label="Choose server" onClick={() => {
-            setPlaybackError(null); setIsStreamSelectorOpen(true);
-          }} />}
-          {onBack && <TouchPill label="Back" onClick={onBack} />}
+        <div role="alert" className="player-recovery">
+          <span className="player-state-icon"><PlayerIcon name="server" /></span>
+          <span className="player-eyebrow">PLAYBACK INTERRUPTED</span>
+          <h3>Let’s get you back to watching.</h3>
+          <p>{playbackError}</p>
+          <div className="player-recovery-actions">
+            <button type="button" className="player-primary" onClick={() => setRetryCount((count) => count + 1)}>Retry stream</button>
+            {availableStreams.length > 1 && <button type="button" className="player-secondary" onClick={() => {
+              setPlaybackError(null); setIsStreamSelectorOpen(true);
+            }}>Choose server</button>}
+            {onBack && <button type="button" className="player-secondary" onClick={onBack}>Back</button>}
+          </div>
         </div>
       )}
-      {subtitles.error && <div role="status" style={{ position: 'absolute', bottom: 120, zIndex: 55,
-        padding: 12, borderRadius: 12, background: '#18181b', color: '#fff' }}>{subtitles.error}</div>}
-      {/* Buffering Spinner */}
-      {isBuffering && stream.format !== 'embed' && (
-        <div
-          style={{
-            position: 'absolute',
-            zIndex: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 12,
-            color: colors.accent.primary,
-          }}
-        >
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: '50%',
-              border: `3.5px solid ${colors.border.subtle}`,
-              borderTopColor: colors.accent.primary,
-              animation: 'spin 0.8s linear infinite',
-            }}
-          />
+      {subtitles.error && <div role="status" className="player-notice">{subtitles.error}</div>}
+      {isBuffering && !playbackError && stream.format !== 'embed' && (
+        <div className="player-buffering" role="status">
+          <span className="player-spinner" />
+          <span>{duration ? 'Buffering' : 'Preparing your stream'}</span>
         </div>
       )}
 
@@ -468,7 +488,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
           }}
         >
-          <span style={{ fontSize: '22px' }}>☀️</span>
+          <span style={{ fontSize: '22px' }}><PlayerIcon name="sun" /></span>
           <div style={{ height: 130, display: 'flex', alignItems: 'center' }}>
             <TouchSlider
               value={brightness}
@@ -506,7 +526,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
           }}
         >
-          <span style={{ fontSize: '22px' }}>🔊</span>
+          <span style={{ fontSize: '22px' }}><PlayerIcon name="volume" /></span>
           <div style={{ height: 130, display: 'flex', alignItems: 'center' }}>
             <TouchSlider
               value={volume}
@@ -543,7 +563,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             flexDirection: 'column',
             alignItems: 'center',
             gap: 6,
-            boxShadow: `0 0 25px ${colors.accent.primary}55`,
+            boxShadow: '0 8px 32px #0004',
           }}
         >
           <span style={{ fontSize: '24px', fontWeight: 800, color: colors.accent.primary }}>
@@ -564,7 +584,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 30,
-            backgroundColor: 'rgba(6, 182, 212, 0.25)',
+            backgroundColor: 'rgba(20, 23, 28, 0.65)',
             backdropFilter: 'blur(8px)',
             borderRadius: '50%',
             width: 100,
@@ -575,11 +595,11 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             fontSize: '18px',
             fontWeight: 800,
             color: '#fff',
-            border: `2.5px solid ${colors.accent.primary}`,
-            boxShadow: `0 0 20px ${colors.accent.primary}66`,
+            border: '1px solid #ffffff20',
+            boxShadow: '0 8px 32px #0004',
           }}
         >
-          {doubleTapFeedback === 'backward' ? '◀◀ 10s' : '10s ▶▶'}
+          <PlayerIcon name={doubleTapFeedback === 'backward' ? 'rewind' : 'forward'} /><span style={{ marginLeft: 8 }}>10s</span>
         </div>
       )}
 
@@ -624,7 +644,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={{ fontSize: '28px' }}>🔒</div>
+          <PlayerIcon name="lock" />
           <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>
             Touch Controls Locked
           </div>
@@ -637,7 +657,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             style={{
               padding: '10px 22px',
               borderRadius: 14,
-              backgroundColor: colors.accent.primary,
+              backgroundColor: '#e1edf0',
               border: 'none',
               color: '#000',
               fontWeight: 800,
@@ -646,7 +666,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               touchAction: 'manipulation',
             }}
           >
-            Tap to Unlock 🔓
+            Unlock controls
           </button>
         </div>
       )}
@@ -654,14 +674,17 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       {/* Screen Lock Toggle Button (Always visible on touch) */}
       <button
         type="button"
+        className="player-lock"
+        tabIndex={isHUDVisible || isLocked ? 0 : -1}
         onClick={() => setIsLocked((prev) => !prev)}
         style={{
           position: 'absolute',
+          visibility: isHUDVisible || isLocked ? 'visible' : 'hidden',
           top: 24,
           right: 24,
           zIndex: 40,
-          backgroundColor: isLocked ? colors.status.danger : 'rgba(9, 9, 11, 0.75)',
-          border: `1.5px solid ${isLocked ? colors.status.danger : colors.border.subtle}`,
+          backgroundColor: isLocked ? '#ffffff25' : 'rgba(9, 9, 11, 0.35)',
+          border: '1px solid #ffffff20',
           borderRadius: '50%',
           width: 48,
           height: 48,
@@ -676,7 +699,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         }}
         aria-label={isLocked ? 'Unlock controls' : 'Lock controls'}
       >
-        {isLocked ? '🔒' : '🔓'}
+        <PlayerIcon name={isLocked ? 'lock' : 'unlock'} />
       </button>
 
       {/* Next Episode Floating Overlay Banner (last 30s) */}
@@ -684,18 +707,20 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         <div
           style={{
             position: 'absolute',
-            bottom: 110,
+            bottom: 160,
+            maxWidth: 'calc(100% - 48px)',
+            boxSizing: 'border-box',
             right: 24,
             zIndex: 35,
             backgroundColor: 'rgba(9, 9, 11, 0.95)',
             backdropFilter: 'blur(14px)',
-            border: `1.5px solid ${colors.accent.primary}`,
+            border: '1px solid #ffffff26',
             borderRadius: 20,
             padding: '16px 22px',
             display: 'flex',
             alignItems: 'center',
             gap: 16,
-            boxShadow: `0 8px 32px rgba(0,0,0,0.7), 0 0 20px ${colors.accent.primary}33`,
+            boxShadow: '0 12px 40px #0006',
           }}
         >
           <div>
@@ -703,7 +728,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               UP NEXT
             </div>
             <div style={{ fontSize: '15px', color: '#fff', fontWeight: 700, marginTop: 2 }}>
-              Next Episode Playing Soon
+              Next episode starts soon
             </div>
           </div>
           <button
@@ -712,7 +737,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             style={{
               padding: '10px 18px',
               borderRadius: 12,
-              backgroundColor: colors.accent.primary,
+              backgroundColor: '#e1edf0',
               border: 'none',
               color: '#000',
               fontWeight: 800,
@@ -721,288 +746,96 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
               touchAction: 'manipulation',
             }}
           >
-            Play Now ▶
+            Play now
           </button>
         </div>
       )}
 
-      {/* Floating Top Bar for Embed Mode */}
       {stream.format === 'embed' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            padding: '20px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            zIndex: 40,
-            pointerEvents: 'none',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'auto' }}>
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                style={{
-                  ...topIconButtonStyle,
-                  backgroundColor: 'rgba(9, 9, 11, 0.75)',
-                }}
-              >
-                ◀
-              </button>
-            )}
-            <div>
-              <h2 style={{ margin: 0, fontSize: '17px', color: '#fff', fontWeight: 800 }}>
-                {media.title}
-              </h2>
-              {episode && (
-                <span style={{ fontSize: '13px', color: colors.text.secondary }}>
-                  S{episode.season}:E{episode.episode} — {episode.title}
-                </span>
-              )}
+        <div className="player-embed-header">
+          <div className="player-heading">
+            {onBack && <button type="button" className="player-icon" aria-label="Back" onClick={onBack}><PlayerIcon name="back" /></button>}
+            <div className="player-title-block">
+              <span className="player-eyebrow">{episode ? `SEASON ${episode.season} · EPISODE ${episode.episode}` : 'NOW PLAYING'}</span>
+              <h2>{media.title}</h2>
             </div>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginRight: 58, pointerEvents: 'auto' }}>
-            {availableStreams.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setIsStreamSelectorOpen((prev) => !prev)}
-                style={{
-                  ...topIconButtonStyle,
-                  width: 'auto',
-                  padding: '0 16px',
-                  borderRadius: 16,
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  backgroundColor: 'rgba(9, 9, 11, 0.8)',
-                  border: `1px solid ${colors.border.subtle}`,
-                }}
-              >
-                {stream.name} ▾
-              </button>
-            )}
-          </div>
+          {availableStreams.length > 1 && <button type="button" className="player-secondary" aria-label="Choose server" aria-expanded={isStreamSelectorOpen}
+            onClick={() => setIsStreamSelectorOpen((prev) => !prev)}><PlayerIcon name="server" /><span>{stream.name}</span></button>}
         </div>
       )}
-
-      {/* Stream Selector Dropdown */}
       {isStreamSelectorOpen && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 76,
-            right: 80,
-            backgroundColor: colors.bg.surface,
-            border: `1.5px solid ${colors.border.subtle}`,
-            borderRadius: 18,
-            padding: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            zIndex: 50,
-            boxShadow: '0 12px 36px rgba(0,0,0,0.85)',
-          }}
-        >
-          {availableStreams.map((s) => (
-            <TouchPill
-              key={s.id}
-              label={s.name}
-              active={s.id === stream.id}
-              size="sm"
-              onClick={() => {
-                onSelectStream?.(s);
-                setIsStreamSelectorOpen(false);
-              }}
-            />
+        <div className={`player-servers ${stream.format === 'embed' ? 'is-embed' : ''}`} role="dialog" aria-label="Playback servers"
+          onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setIsStreamSelectorOpen(false); } }}>
+          <div className="player-servers-heading"><div><span className="player-eyebrow">PLAYBACK</span><h3>Choose a server</h3></div>
+            <button type="button" className="player-icon" aria-label="Close server selector" onClick={() => setIsStreamSelectorOpen(false)}><PlayerIcon name="close" /></button></div>
+          {availableStreams.map((source, index) => (
+            <button type="button" key={source.id} className="player-server-option" aria-pressed={source.id === stream.id}
+              onClick={() => { onSelectStream?.(source); setIsStreamSelectorOpen(false); }}>
+              <span className="player-server-number">{String(index + 1).padStart(2, '0')}</span>
+              <span className="player-server-label">{source.name}<small>{source.id === stream.id ? 'Currently playing' : 'Switch to this source'}</small></span>
+              {source.id === stream.id && <PlayerIcon name="check" />}
+            </button>
           ))}
         </div>
       )}
 
-      {/* Main HUD Overlay Controls (Native Video Mode) */}
-      {stream.format !== 'embed' && isHUDVisible && !isLocked && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 20,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            padding: 'clamp(12px, 3vw, 24px)',
-            transition: 'opacity 0.25s ease',
-          }}
-          onClick={(e) => {
-            // Surface taps are handled by the gesture coordinator.
-          }}
-        >
-          {/* Top Bar */}
-          <div className="player-topbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              {onBack && (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  style={topIconButtonStyle}
-                  aria-label="Back"
-                >
-                  ◀
-                </button>
-              )}
-              <div>
-                <h2 style={{ margin: 0, fontSize: '18px', color: '#fff', fontWeight: 800 }}>
-                  {media.title}
-                </h2>
-                {episode && (
-                  <span style={{ fontSize: '13px', color: colors.text.secondary }}>
-                    S{episode.season}:E{episode.episode} — {episode.title}
-                  </span>
-                )}
+      <style>{playerStyles}</style>
+      {/* Cinema controls keep the picture clear between the top and bottom gradients. */}
+      {stream.format !== 'embed' && !isLocked && (
+        <div className={`player-chrome ${isPlaying ? 'is-playing' : 'is-paused'} ${isHUDVisible ? '' : 'is-hidden'}`} aria-hidden={!isHUDVisible}>
+          <div className="player-header">
+            <div className="player-heading">
+              {onBack && <button type="button" className="player-icon" onClick={onBack} aria-label="Back"><PlayerIcon name="back" /></button>}
+              <div className="player-title-block">
+                <span className="player-eyebrow">{episode ? `SEASON ${episode.season} · EPISODE ${episode.episode}` : 'NOW PLAYING'}</span>
+                <h2>{media.title}</h2>
+                {episode && <p>{episode.title}</p>}
               </div>
             </div>
-
-            {/* Quick action buttons in top bar */}
-            <div className="player-quick-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 58, flexWrap: 'wrap' }}>
-              {/* Aspect Ratio Button */}
-              <button
-                type="button"
-                onClick={handleCycleAspect}
-                style={topIconButtonStyle}
-                title="Aspect Ratio"
-              >
-                ⛶
-              </button>
-
-              {/* Subtitles Button */}
-              <button
-                type="button"
-                onClick={() => setIsSubModalOpen(true)}
-                style={topIconButtonStyle}
-                title="Subtitles & Sync"
-              >
-                💬
-              </button>
-
-              {/* Server / Stream Selector */}
-              {availableStreams.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setIsStreamSelectorOpen((prev) => !prev)}
-                  style={{
-                    ...topIconButtonStyle,
-                    width: 'auto',
-                    padding: '0 14px',
-                    borderRadius: 16,
-                    fontSize: '13px',
-                    fontWeight: 700,
-                  }}
-                >
-                  {stream.name} ▾
-                </button>
-              )}
-            </div>
+            <div className="player-source">{stream.name}</div>
           </div>
 
-          {/* Center Play/Pause Large Touch Buttons */}
-          <div
-            style={{
-              alignSelf: 'center',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'clamp(12px, 4vw, 36px)',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                if (videoRef.current) {
-                  videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
-                }
-              }}
-              style={centerCircleButtonStyle}
-              aria-label="Seek back 10 seconds"
-            >
-              -10s
+          <div className="player-transport" style={{ visibility: isBuffering || playbackError ? 'hidden' : 'visible' }}>
+            <button type="button" className="player-seek" aria-label="Seek back 10 seconds" onClick={() => {
+              if (videoRef.current) videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+            }}><PlayerIcon name="rewind" /><span>10</span></button>
+            <button type="button" className="player-play" onClick={handleTogglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
+              <PlayerIcon name={isPlaying ? 'pause' : 'play'} />
             </button>
-            <button
-              type="button"
-              onClick={handleTogglePlay}
-              style={{
-                ...centerCircleButtonStyle,
-                width: 78,
-                height: 78,
-                fontSize: '32px',
-                backgroundColor: colors.accent.primary,
-                color: '#000',
-                boxShadow: `0 0 24px ${colors.accent.primary}66`,
-              }}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isPlaying ? '⏸' : '▶'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (videoRef.current) {
-                  videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 10);
-                }
-              }}
-              style={centerCircleButtonStyle}
-              aria-label="Seek forward 10 seconds"
-            >
-              +10s
-            </button>
+            <button type="button" className="player-seek" aria-label="Seek forward 10 seconds" onClick={() => {
+              if (videoRef.current) videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 10);
+            }}><PlayerIcon name="forward" /><span>10</span></button>
           </div>
 
-          {/* Bottom Bar: Progress scrubber & time */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <TouchSlider
-              value={currentTime}
-              label="Playback position"
-              min={0}
-              max={duration || 100}
-              formatTooltip={(val) => formatTime(val)}
-              onChange={(val) => {
-                if (videoRef.current) {
-                  videoRef.current.currentTime = val;
-                  setCurrentTime(val);
-                }
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#fff', fontWeight: 700 }}>
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                {audioTracks.length > 1 && <select aria-label="Audio language" value={audioTrack}
-                  onChange={(event) => { if (hlsRef.current) hlsRef.current.audioTrack = Number(event.target.value); }}
-                  style={{ background: '#18181b', color: '#fff', border: '1px solid #3f3f46', borderRadius: 8, padding: 8, maxWidth: 140 }}>
+          <div className="player-footer">
+            <div className="player-footer-rule" />
+            <div className="player-timeline-meta"><span>{formatTime(currentTime)} <span className="player-time-divider">/ {formatTime(duration)}</span></span>
+              <span>{duration > 0 ? `${formatTime(duration - currentTime)} remaining` : 'Loading stream'}</span></div>
+            <input className="player-timeline" type="range" aria-label="Playback position" min={0} max={duration || 100} step={0.1}
+              value={currentTime} disabled={!duration} style={{ '--progress': `${duration ? Math.min(100, currentTime / duration * 100) : 0}%` } as React.CSSProperties}
+              onChange={(event) => { const time = Number(event.target.value); if (videoRef.current) { videoRef.current.currentTime = time; setCurrentTime(time); } }} />
+            <div className="player-toolbar">
+              <div className="player-toolbar-group">
+                <button type="button" className="player-icon" aria-label={volume === 0 ? 'Unmute' : 'Mute'} onClick={() => {
+                  if (volume > 0) previousVolume.current = volume;
+                  const next = volume === 0 ? previousVolume.current : 0; setVolume(next); if (videoRef.current) videoRef.current.volume = next / 100;
+                }}><PlayerIcon name={volume === 0 ? 'muted' : 'volume'} /></button>
+                <input className="player-volume" type="range" aria-label="Volume" min={0} max={100} value={volume}
+                  onChange={(event) => { const value = Number(event.target.value); setVolume(value); if (videoRef.current) videoRef.current.volume = value / 100; }} />
+                {hasNextEpisode && onNextEpisode && <button type="button" className="player-text-button" onClick={onNextEpisode}><PlayerIcon name="next" /><span>Next episode</span></button>}
+              </div>
+              <div className="player-toolbar-group">
+                {audioTracks.length > 1 && <select className="player-audio" aria-label="Audio language" value={audioTrack}
+                  onChange={(event) => { if (hlsRef.current) hlsRef.current.audioTrack = Number(event.target.value); }}>
                   {audioTrack < 0 && <option value={-1}>Audio language</option>}
                   {audioTracks.map((track) => <option key={track.id} value={track.id}>{track.label}</option>)}
                 </select>}
-                {hasNextEpisode && onNextEpisode && (
-                  <button
-                    type="button"
-                    onClick={onNextEpisode}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: colors.accent.primary,
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      touchAction: 'manipulation',
-                    }}
-                  >
-                    Next Episode ▶|
-                  </button>
-                )}
+                {availableStreams.length > 1 && <button type="button" className="player-icon" aria-label="Choose server" title="Choose server" aria-expanded={isStreamSelectorOpen}
+                  onClick={() => setIsStreamSelectorOpen((prev) => !prev)}><PlayerIcon name="server" /></button>}
+                <button type="button" className="player-icon" aria-label="Subtitles & Sync" title="Subtitles & Sync" aria-haspopup="dialog" onClick={() => setIsSubModalOpen(true)}><PlayerIcon name="captions" /></button>
+                <button type="button" className="player-icon" aria-label={`Aspect ratio: ${aspectRatio}`} title={`Aspect ratio: ${aspectRatio}`} onClick={handleCycleAspect}><PlayerIcon name="aspect" /></button>
+                <button type="button" className="player-icon" aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={toggleFullscreen}><PlayerIcon name="fullscreen" /></button>
               </div>
             </div>
           </div>
@@ -1024,39 +857,4 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       />
     </div>
   );
-};
-
-const topIconButtonStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(255,255,255,0.15)',
-  border: 'none',
-  borderRadius: '50%',
-  width: 44,
-  height: 44,
-  color: '#fff',
-  fontSize: '18px',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  touchAction: 'manipulation',
-  WebkitTapHighlightColor: 'transparent',
-  transition: 'transform 0.15s ease',
-};
-
-const centerCircleButtonStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(9, 9, 11, 0.75)',
-  border: `1.5px solid ${colors.border.subtle}`,
-  borderRadius: '50%',
-  width: 60,
-  height: 60,
-  color: '#fff',
-  fontSize: '15px',
-  fontWeight: 800,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  touchAction: 'manipulation',
-  WebkitTapHighlightColor: 'transparent',
-  transition: 'transform 0.15s ease',
 };

@@ -128,8 +128,6 @@ input:focus-visible, textarea:focus-visible { outline-offset: 2px; }
 @media (max-width: 600px) {
   .catalog-view { padding-inline: 16px; gap: 22px; }
   .media-grid { gap: 12px; }
-  .video-player h2 { font-size: 14px !important; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .video-player [title] { width: 36px !important; height: 36px !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

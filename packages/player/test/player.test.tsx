@@ -123,3 +123,45 @@ it('respects an explicit automatic-subtitles Off preference for external tracks'
   expect(request).not.toHaveBeenCalled();
   expect(container.querySelector('track')).toBeNull();
 });
+
+describe('cinema controls', () => {
+  it('connects the timeline and volume controls to the video', () => {
+    const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const video = container.querySelector('video')!;
+    setupVideo(video);
+    fireEvent.change(getByRole('slider', { name: 'Playback position' }), { target: { value: '45' } });
+    expect(video.currentTime).toBe(45);
+    fireEvent.change(getByRole('slider', { name: 'Volume' }), { target: { value: '35' } });
+    expect(video.volume).toBe(0.35);
+    fireEvent.click(getByRole('button', { name: 'Mute' }));
+    expect(video.volume).toBe(0);
+    fireEvent.click(getByRole('button', { name: 'Unmute' }));
+    expect(video.volume).toBeGreaterThan(0);
+  });
+
+  it('requests fullscreen on the player container', () => {
+    const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const request = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(container.querySelector('.video-player'), 'requestFullscreen', { value: request });
+    fireEvent.click(getByRole('button', { name: 'Enter fullscreen' }));
+    expect(request).toHaveBeenCalledOnce();
+  });
+});
+
+it('switches servers and lets Escape dismiss the picker without leaving playback', () => {
+  const back = vi.fn();
+  const select = vi.fn();
+  const other = { ...stream, id: 'alternate', name: 'Alternate server' };
+  const { getByRole, queryByRole } = render(<VideoPlayerWeb media={media} stream={stream}
+    availableStreams={[stream, other]} onSelectStream={select} onBack={back} />);
+  fireEvent.click(getByRole('button', { name: 'Choose server' }));
+  const dialog = getByRole('dialog', { name: 'Playback servers' });
+  expect(document.activeElement).toBe(getByRole('button', { name: 'Close server selector' }));
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  expect(queryByRole('dialog', { name: 'Playback servers' })).toBeNull();
+  expect(back).not.toHaveBeenCalled();
+  fireEvent.click(getByRole('button', { name: 'Choose server' }));
+  fireEvent.click(getByRole('button', { name: /Alternate server/ }));
+  expect(select).toHaveBeenCalledWith(other);
+  expect(queryByRole('dialog', { name: 'Playback servers' })).toBeNull();
+});
