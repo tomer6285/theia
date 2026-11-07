@@ -38,7 +38,7 @@ CI runs these checks and exports the Android JavaScript bundle.
 
 Browser requests to some providers and media CDNs need a proxy because of CORS. The local Vite app automatically uses its same-origin `/api/proxy`, including when opened over a LAN IP. Leaving **Settings → Playback proxy address** blank uses this automatic route; a custom endpoint overrides it. Static production builds use a direct connection until a proxy is configured.
 
-For a hosted web app or packaged Electron app, deploy `services/edge-proxy` and enter its full HTTPS address. Static Vite output does not include a proxy server. Electron keeps browser security enabled and also needs a proxy for sources without suitable CORS headers.
+For a hosted web app, deploy `services/edge-proxy` and enter its full HTTPS address. Static Vite output does not include a proxy server. Electron bundles the same proxy implementation and starts a private loopback endpoint automatically; no separately hosted proxy is needed. Leave the playback proxy setting blank to use it, or enter a custom endpoint to override it. Desktop playback still requires internet access to metadata and streaming providers.
 
 The Worker handles GET/HEAD and byte ranges, preserves cancellation, follows validated redirects, and rewrites HLS playlist references, alternate tracks, initialization files, and encryption keys. Provider HTML can be fetched for discovery but is served as inert text. Application cookies and authorization headers are not forwarded upstream.
 

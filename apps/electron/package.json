@@ -5,7 +5,7 @@
   "homepage": "https://github.com/tomer6285/theia",
   "author": "Tomer Chalabi <tomerchalabi@gmail.com>",
   "private": true,
-  "main": "./dist/main.js",
+  "main": "./dist/apps/electron/src/main.js",
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",

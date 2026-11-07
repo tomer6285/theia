@@ -5,7 +5,7 @@ import './index.css';
 import App from './App';
 
 // Vite serves discovery and media through the same LAN-accessible origin.
-setDefaultProxyUrl(import.meta.env.DEV ? '/api/proxy' : '');
+setDefaultProxyUrl(window.theiaElectron?.proxyUrl || (import.meta.env.DEV ? '/api/proxy' : ''));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
