@@ -204,7 +204,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         inset: 0,
         zIndex: 100,
         backgroundColor: `rgba(0,0,0,${Math.max(0.3, 0.85 - dragY / 400)})`,
-        backdropFilter: 'blur(12px)',
+        backdropFilter: 'blur(6px)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
@@ -224,16 +224,16 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           width: '100%',
           maxHeight: '92vh',
           backgroundColor: colors.bg.surface,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          borderTop: `1.5px solid ${colors.border.subtle}`,
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          borderTop: `1px solid ${colors.border.subtle}`,
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',
           touchAction: 'pan-y',
           transform: `translateY(${dragY}px)`,
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 -15px 50px rgba(0,0,0,0.85)',
+          boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
           WebkitOverflowScrolling: 'touch',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -286,8 +286,8 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             backgroundImage: backdropUrl ? `url(${JSON.stringify(backdropUrl)})` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center 20%',
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
             flexShrink: 0,
             cursor: 'grab',
             touchAction: 'none',
@@ -336,13 +336,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               {media.rating && (
                 <span
                   style={{
-                    backgroundColor: 'rgba(9, 9, 11, 0.85)',
-                    color: '#facc15',
+                    backgroundColor: 'transparent',
+                    color: colors.text.primary,
                     fontSize: '12px',
-                    fontWeight: 800,
-                    padding: '3px 8px',
+                    fontWeight: 600,
+                    padding: '3px 0',
                     borderRadius: 6,
-                    border: '1px solid rgba(250, 204, 21, 0.3)',
+                    border: 'none',
                   }}
                 >
                   ★ {media.rating}
@@ -356,16 +356,16 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               <span
                 style={{
                   fontSize: '11px',
-                  textTransform: 'uppercase',
-                  color: colors.accent.primary,
-                  fontWeight: 800,
+                  textTransform: 'capitalize',
+                  color: colors.text.secondary,
+                  fontWeight: 600,
                   letterSpacing: '0.5px',
                 }}
               >
                 {media.type}
               </span>
             </div>
-            <h1 style={{ margin: 0, fontSize: '26px', color: '#fff', fontWeight: 900, letterSpacing: '-0.5px' }}>
+            <h1 style={{ margin: 0, fontSize: '26px', color: '#fff', fontWeight: 700, letterSpacing: '-0.5px' }}>
               {media.title}
             </h1>
           </div>
@@ -381,19 +381,19 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               onClick={() => handleStartPlayback()}
               style={{
                 flex: 1,
-                height: 54,
-                borderRadius: 16,
-                backgroundColor: isNoStreamsAvailable ? colors.bg.elevated : colors.accent.primary,
+                height: 44,
+                borderRadius: 8,
+                backgroundColor: isNoStreamsAvailable ? colors.bg.elevated : colors.text.primary,
                 border: 'none',
                 color: isNoStreamsAvailable ? colors.text.muted : '#000',
                 fontSize: '16px',
-                fontWeight: 800,
+                fontWeight: 600,
                 cursor: isNoStreamsAvailable ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 10,
-                boxShadow: !isNoStreamsAvailable ? `0 0 20px ${colors.accent.primary}66` : 'none',
+                boxShadow: 'none',
                 transition: 'all 0.2s ease',
                 touchAction: 'manipulation',
               }}
@@ -446,11 +446,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 type="button"
                 onClick={() => setIsEpisodeSheetOpen(true)}
                 style={{
-                  height: 54,
+                  height: 44,
                   padding: '0 20px',
-                  borderRadius: 16,
+                  borderRadius: 8,
                   backgroundColor: colors.bg.elevated,
-                  border: `1.5px solid ${colors.border.subtle}`,
+                  border: `1px solid ${colors.border.subtle}`,
                   color: '#fff',
                   fontSize: '15px',
                   fontWeight: 700,
@@ -461,7 +461,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                   touchAction: 'manipulation',
                 }}
               >
-                <span>📺 Episodes</span>
+                <span>Episodes</span>
               </button>
             )}
 
@@ -470,11 +470,11 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               type="button"
               onClick={() => theiaStore.getState().toggleFavorite(media)}
               style={{
-                width: 54,
-                height: 54,
-                borderRadius: 16,
+                width: 44,
+                height: 44,
+                borderRadius: 8,
                 backgroundColor: colors.bg.elevated,
-                border: `1.5px solid ${colors.border.subtle}`,
+                border: `1px solid ${colors.border.subtle}`,
                 color: isFav ? '#ef4444' : colors.text.secondary,
                 fontSize: '22px',
                 cursor: 'pointer',
@@ -492,42 +492,10 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           {media.type === 'series' && !selectedEpisode && <p role="status" style={{ color: colors.text.secondary }}>
             {isLoadingDetails ? 'Loading episode information…' : 'Episode information is unavailable for this series.'}
           </p>}
-          {/* Current episode indicator for Series with Change Action */}
           {selectedEpisode && (
-            <div
-              style={{
-                padding: '12px 16px',
-                borderRadius: 14,
-                backgroundColor: `${colors.accent.primary}15`,
-                border: `1.5px solid ${colors.accent.primary}44`,
-                fontSize: '14px',
-                color: colors.accent.primary,
-                fontWeight: 700,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span>
-                Selected: S{selectedEpisode.season}:E{selectedEpisode.episode} — {selectedEpisode.title}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsEpisodeSheetOpen(true)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#fff',
-                  textDecoration: 'underline',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                }}
-              >
-                Change
-              </button>
-            </div>
+            <p style={{ margin: '-8px 0 0', fontSize: '14px', color: colors.text.secondary, lineHeight: 1.5 }}>
+              S{selectedEpisode.season} · E{selectedEpisode.episode} — {selectedEpisode.title}
+            </p>
           )}
 
           {isNoStreamsAvailable && <div role="status" className="empty-state">
@@ -538,17 +506,28 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           {streams.length > 0 && (
             <div>
               <span style={{ fontSize: '13px', fontWeight: 700, color: colors.text.muted, display: 'block', marginBottom: 10 }}>
-                Available Servers & Formats
+                Source
               </span>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {streams.map((s) => (
-                  <TouchPill
+                  <button
                     key={s.id}
-                    label={`${s.name} (${s.format.toUpperCase()})`}
-                    active={selectedStream?.id === s.id}
-                    size="sm"
+                    type="button"
+                    aria-pressed={selectedStream?.id === s.id}
                     onClick={() => setSelectedStream(s)}
-                  />
+                    style={{
+                      padding: '8px 12px',
+                      minHeight: 36,
+                      borderRadius: 6,
+                      border: `1px solid ${selectedStream?.id === s.id ? colors.border.default : colors.border.subtle}`,
+                      background: selectedStream?.id === s.id ? colors.bg.elevated : 'transparent',
+                      color: selectedStream?.id === s.id ? colors.text.primary : colors.text.secondary,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {s.name} · {s.format.toUpperCase()}
+                  </button>
                 ))}
               </div>
             </div>
@@ -557,20 +536,18 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
           {/* Genres Chips */}
           {media.genres && media.genres.length > 0 && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {media.genres.map((g) => (
+              {media.genres.map((g, index) => (
                 <span
                   key={g}
                   style={{
                     fontSize: '12px',
                     fontWeight: 600,
-                    padding: '5px 12px',
-                    borderRadius: 10,
-                    backgroundColor: colors.bg.elevated,
+                    padding: 0,
+                    borderRadius: 0,
                     color: colors.text.secondary,
-                    border: `1px solid ${colors.border.subtle}`,
                   }}
                 >
-                  {g}
+                  {index > 0 ? `· ${g}` : g}
                 </span>
               ))}
             </div>
@@ -586,8 +563,8 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
                 style={{
                   margin: 0,
                   fontSize: '14px',
-                  color: colors.text.muted,
-                  lineHeight: '1.6',
+                  color: colors.text.secondary,
+                  lineHeight: '1.7',
                 }}
               >
                 {media.description}
