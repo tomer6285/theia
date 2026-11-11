@@ -1,3 +1,4 @@
+import { isPlaybackCompleted } from './completion';
 import { readEmbedProgress, supportsEmbedProgress } from './embedProgress';
 import { useVideoSubtitles } from './useVideoSubtitles';
 import { preferredTrackIndex } from './languages';
@@ -20,6 +21,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   onSelectStream,
   autoPlay = true,
   initialTime,
+  completionPolicy,
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -137,9 +139,9 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     theiaStore.getState().updateProgress({
       mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
       positionSeconds: video.currentTime, durationSeconds: video.duration, percentage,
-      completed: video.ended || percentage > 92, updatedAt: Date.now(),
+      completed: isPlaybackCompleted(video.currentTime, video.duration, video.ended, media.type === 'series', stream.creditsStartSeconds, completionPolicy), updatedAt: Date.now(),
     }, media);
-  }, [media, episode]);
+  }, [media, episode, stream.creditsStartSeconds, completionPolicy]);
   const saveProgress = useCallback(() => saveVideoProgress(videoRef.current), [saveVideoProgress]);
 
   const nextEpisodeCallback = useRef(onNextEpisode);
@@ -169,7 +171,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       theiaStore.getState().updateProgress({
         mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
         positionSeconds: latest.time, durationSeconds: latest.duration, percentage,
-        completed: latest.ended || percentage > 92, updatedAt: Date.now(),
+        completed: isPlaybackCompleted(latest.time, latest.duration, latest.ended, media.type === 'series', stream.creditsStartSeconds, completionPolicy), updatedAt: Date.now(),
       }, media);
       lastSave = Date.now();
     };
@@ -197,7 +199,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', hidden);
     };
-  }, [embedSession, media, episode, hasNextEpisode]);
+  }, [embedSession, media, episode, hasNextEpisode, stream.creditsStartSeconds, completionPolicy]);
 
   useEffect(() => {
     setSubtitleOffsetMs(theiaStore.getState().getSubtitleOffset(media.id));

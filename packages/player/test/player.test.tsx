@@ -2,7 +2,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
-import { theiaStore, setDefaultProxyUrl } from '@theia/core';
+import { theiaStore, setDefaultProxyUrl, getContinueWatching } from '@theia/core';
 import { VideoPlayerWeb } from '../src/VideoPlayer.web';
 import type { MediaItem, StreamSource } from '@theia/core';
 vi.mock('hls.js', () => ({ default: { isSupported: () => false } }));
@@ -244,4 +244,51 @@ it('tracks only events from the active VidLink iframe and keeps its resume URL s
   unmount();
   send('https://vidlink.pro', null, 60);
   expect(theiaStore.getState().getProgress(media.id)?.positionSeconds).toBe(45);
+});
+
+
+it.each(['pause', 'pagehide', 'background', 'unmount', 'periodic'])('saves credits completion on %s without losing the movie timestamp', (event) => {
+  vi.useFakeTimers();
+  const { container, unmount } = render(<VideoPlayerWeb media={media} stream={{ ...stream, creditsStartSeconds: 80 }} />);
+  const video = container.querySelector('video')!;
+  setupVideo(video);
+  video.currentTime = 85;
+  if (event === 'pause') fireEvent.pause(video);
+  else if (event === 'pagehide') window.dispatchEvent(new Event('pagehide'));
+  else if (event === 'background') {
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+  else if (event === 'periodic') vi.advanceTimersByTime(5000);
+  else unmount();
+  expect(theiaStore.getState().getProgress(media.id)).toMatchObject({ positionSeconds: 85, completed: true });
+  expect(getContinueWatching(theiaStore.getState().history)).toEqual([]);
+  vi.useRealTimers();
+});
+
+it('offers the next episode at credits without starting it automatically', () => {
+  const episode = { id: 'first', title: 'First', season: 1, episode: 1 };
+  const next = { id: 'second', title: 'Second', season: 1, episode: 2 };
+  const show: MediaItem = { ...media, type: 'series', episodes: [episode, next] };
+  const onNext = vi.fn();
+  const { container } = render(<VideoPlayerWeb media={show} episode={episode}
+    stream={{ ...stream, creditsStartSeconds: 80 }} onNextEpisode={onNext} hasNextEpisode />);
+  const video = container.querySelector('video')!;
+  setupVideo(video);
+  video.currentTime = 85;
+  fireEvent.pause(video);
+  expect(getContinueWatching(theiaStore.getState().history)[0].nextEpisode?.id).toBe(next.id);
+  expect(theiaStore.getState().getProgress(show.id, episode.id)?.positionSeconds).toBe(85);
+  expect(onNext).not.toHaveBeenCalled();
+});
+
+it('applies credits timing to supported embed progress', () => {
+  const { container } = render(<VideoPlayerWeb media={media} stream={{ ...stream,
+    provider: 'vidlink', format: 'embed', url: 'https://vidlink.pro/movie/123', creditsStartSeconds: 80 }} />);
+  window.dispatchEvent(new MessageEvent('message', {
+    origin: 'https://vidlink.pro', source: container.querySelector('iframe')!.contentWindow,
+    data: { type: 'PLAYER_EVENT', data: { event: 'pause', currentTime: 85, duration: 100, mediaType: 'movie', mtmdbId: 123 } },
+  }));
+  expect(theiaStore.getState().getProgress(media.id)).toMatchObject({ positionSeconds: 85, completed: true });
+  expect(getContinueWatching(theiaStore.getState().history)).toEqual([]);
 });
