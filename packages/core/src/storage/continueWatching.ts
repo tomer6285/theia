@@ -10,7 +10,7 @@ export function getContinueWatching(history: WatchHistoryItem[], now = Date.now(
   return [...history].sort((a, b) => b.lastWatchedAt - a.lastWatchedAt).flatMap((item) => {
     if (seen.has(item.media.id)) return [];
     seen.add(item.media.id);
-    if (!item.progress.completed) return item.progress.percentage > 1 ? [item] : [];
+    if (!item.progress.completed) return item.progress.positionSeconds > 0 ? [item] : [];
     if (item.media.type !== 'series') return [];
     const episodes = [...(item.media.episodes || [])].filter(e => e.season > 0)
       .sort((a, b) => a.season - b.season || a.episode - b.episode);

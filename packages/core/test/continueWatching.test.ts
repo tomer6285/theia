@@ -10,6 +10,23 @@ const item = (episodeId: string, lastWatchedAt: number, completed = false): Watc
 it('keeps one entry per series using latest activity even when input is unsorted', () => {
   expect(getContinueWatching([item('one', 1), item('two', 2)]).map(x => x.progress.episodeId)).toEqual(['two']);
 });
+it.each([2, 30])('includes positive saved positions at or below 1%% (%s seconds)', (positionSeconds) => {
+  const entry = item('one', 1);
+  entry.progress = { ...entry.progress, positionSeconds, durationSeconds: 3000, percentage: positionSeconds / 3000 * 100 };
+  expect(getContinueWatching([entry])).toEqual([entry]);
+});
+it('keeps the show visible when the latest episode has only just started', () => {
+  const earlier = item('one', 1);
+  earlier.progress = { ...earlier.progress, positionSeconds: 1200, durationSeconds: 3000, percentage: 40 };
+  const latest = item('two', 2);
+  latest.progress = { ...latest.progress, positionSeconds: 2, durationSeconds: 3000, percentage: 2 / 3000 * 100 };
+  expect(getContinueWatching([earlier, latest])).toEqual([latest]);
+});
+it('excludes zero saved positions even if the stored percentage is positive', () => {
+  const entry = item('one', 1);
+  entry.progress.positionSeconds = 0;
+  expect(getContinueWatching([entry])).toEqual([]);
+});
 it('offers the next season after completion and never resurrects earlier episodes at the finale', () => {
   expect(getContinueWatching([item('one', 2, true)])[0].nextEpisode?.id).toBe('two');
   expect(getContinueWatching([item('two', 3, true), item('one', 1)])).toEqual([]);

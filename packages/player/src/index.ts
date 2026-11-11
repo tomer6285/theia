@@ -2,3 +2,4 @@ export * from './types';
 export * from './gestures';
 export * from './VideoPlayer';
 export * from './VideoPlayer.web';
+export { DEFAULT_COMPLETION_POLICY } from './completion';

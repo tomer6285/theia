@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { isPlaybackCompleted } from './completion';
+import React, { useEffect, useRef, useState } from 'react';
+import { AppState, View, Text, Pressable, StyleSheet } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { WebView } from 'react-native-webview';
 import { theiaStore } from '@theia/core';
@@ -8,7 +9,7 @@ import { VideoPlayerProps } from './types';
 /** Native playback uses Expo's video engine; provider embeds use an isolated WebView. */
 export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
   media, episode, stream, onBack, onNextEpisode, hasNextEpisode = false,
-  autoPlay = true, initialTime,
+  autoPlay = true, initialTime, completionPolicy,
 }) => {
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -16,18 +17,25 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
   const start = useRef(initialTime ?? (theiaStore.getState().settings.autoResume && saved && !saved.completed
     ? saved.positionSeconds : 0));
   const lastSaved = useRef(0);
-  const save = (status: AVPlaybackStatus) => {
+  const latest = useRef<AVPlaybackStatus | null>(null);
+  const save = (status: AVPlaybackStatus, force = false) => {
     if (!status.isLoaded || !status.durationMillis) return;
-    if (!status.didJustFinish && status.isPlaying && Date.now() - lastSaved.current < 5000) return;
+    latest.current = status;
+    if (!force && !status.didJustFinish && status.isPlaying && Date.now() - lastSaved.current < 5000) return;
     lastSaved.current = Date.now();
     const percentage = status.positionMillis / status.durationMillis * 100;
     theiaStore.getState().updateProgress({
       mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
       positionSeconds: status.positionMillis / 1000, durationSeconds: status.durationMillis / 1000,
-      percentage, completed: status.didJustFinish || percentage > 92, updatedAt: Date.now(),
+      percentage, completed: isPlaybackCompleted(status.positionMillis / 1000, status.durationMillis / 1000, status.didJustFinish, media.type === 'series', stream.creditsStartSeconds, completionPolicy), updatedAt: Date.now(),
     }, media);
-    if (status.didJustFinish && hasNextEpisode && theiaStore.getState().settings.autoPlayNext) onNextEpisode?.();
+    if (!force && status.didJustFinish && hasNextEpisode && theiaStore.getState().settings.autoPlayNext) onNextEpisode?.();
   };
+  useEffect(() => {
+    const flush = () => { if (latest.current) save(latest.current, true); };
+    const subscription = AppState.addEventListener('change', state => { if (state !== 'active') flush(); });
+    return () => { flush(); latest.current = null; subscription.remove(); };
+  }, [media, episode, stream, completionPolicy]);
   return (
     <View style={styles.container}>
       {stream.format === 'embed' ? (
@@ -42,7 +50,7 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
             overrideFileExtensionAndroid: stream.format === 'hls' ? 'm3u8' : undefined }}
           style={styles.video} useNativeControls resizeMode={ResizeMode.CONTAIN}
           shouldPlay={autoPlay} positionMillis={Math.max(0, start.current) * 1000}
-          onPlaybackStatusUpdate={save} onError={() => setError('This stream could not be played. Try again or choose another server.')} />
+          onPlaybackStatusUpdate={status => save(status)} onError={() => setError('This stream could not be played. Try again or choose another server.')} />
       )}
       {onBack && <Pressable accessibilityRole="button" accessibilityLabel="Back to details"
         style={styles.back} onPress={onBack}><Text style={styles.text}>‹ Back</Text></Pressable>}
