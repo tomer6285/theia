@@ -1,17 +1,17 @@
 import { useWatchState } from '@theia/ui';
 import React from 'react';
-import { theiaStore, MediaItem } from '@theia/core';
+import { theiaStore, MediaItem, getContinueWatching } from '@theia/core';
 import { colors, MediaCard } from '@theia/ui';
 
 interface ContinueWatchingViewProps {
   onSelectMedia: (media: MediaItem, episodeId?: string) => void;
-  onQuickPlay?: (media: MediaItem) => void;
+  onQuickPlay?: (media: MediaItem, episodeId?: string) => void;
 }
 
 export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSelectMedia, onQuickPlay }) => {
   useWatchState();
   const history = theiaStore.getState().history;
-  const inProgress = history.filter((h) => !h.progress.completed && h.progress.percentage > 1);
+  const inProgress = getContinueWatching(history);
 
   const formatRemaining = (durationSecs: number, posSecs: number) => {
     const remaining = Math.max(0, durationSecs - posSecs);
@@ -54,24 +54,24 @@ export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSe
             No unwatched titles in progress
           </h3>
           <p style={{ margin: 0, fontSize: '14px', color: colors.text.muted, maxWidth: 320, lineHeight: 1.5 }}>
-            Start watching any movie or series from Movies or Shows, and your progress will automatically save here.
+            Movies and shows watched on supported servers save their progress here.
           </p>
         </div>
       ) : (
         <div className="media-grid">
-          {inProgress.map(({ media, progress }) => (
+          {inProgress.map(({ media, progress, nextEpisode }) => (
             <div key={progress.episodeId || media.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <MediaCard
                 media={media}
                 width="100%"
-                onPress={() => onSelectMedia(media, progress.episodeId)}
-                onQuickPlay={() => onSelectMedia(media, progress.episodeId)}
-                progress={progress}
+                onPress={() => (onQuickPlay || onSelectMedia)(media, nextEpisode?.id || progress.episodeId)}
+                onQuickPlay={() => (onQuickPlay || onSelectMedia)(media, nextEpisode?.id || progress.episodeId)}
+                progress={nextEpisode ? undefined : progress}
                 isFavorite={theiaStore.getState().isFavorite(media.id)}
                 onToggleFavorite={() => theiaStore.getState().toggleFavorite(media)}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-                {progress.episode ? (
+                {nextEpisode ? <span style={{ color: colors.accent.primary }}>Up next · S{nextEpisode.season}:E{nextEpisode.episode}</span> : progress.episode ? (
                   <span style={{ fontSize: '13px', color: colors.accent.primary, fontWeight: 700 }}>
                     S{progress.season}:E{progress.episode}
                   </span>
@@ -80,7 +80,7 @@ export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSe
                     {Math.round(progress.percentage)}%
                   </span>
                 )}
-                {progress.durationSeconds > 0 && (
+                {!nextEpisode && progress.durationSeconds > 0 && (
                   <span style={{ fontSize: '12px', color: colors.text.muted }}>
                     {formatRemaining(progress.durationSeconds, progress.positionSeconds)}
                   </span>

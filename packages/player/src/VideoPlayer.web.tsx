@@ -1,3 +1,4 @@
+import { readEmbedProgress, supportsEmbedProgress } from './embedProgress';
 import { useVideoSubtitles } from './useVideoSubtitles';
 import { preferredTrackIndex } from './languages';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
@@ -20,6 +21,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   autoPlay = true,
   initialTime,
 }) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [audioTracks, setAudioTracks] = useState<Array<{ id: number; label: string }>>([]);
@@ -98,6 +100,63 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     }, media);
   }, [media, episode]);
   const saveProgress = useCallback(() => saveVideoProgress(videoRef.current), [saveVideoProgress]);
+
+  const nextEpisodeCallback = useRef(onNextEpisode);
+  nextEpisodeCallback.current = onNextEpisode;
+  const embedSession = `${mediaKey}:${stream.id}:${stream.url}:${initialTime ?? 'auto'}`;
+  const embedStart = React.useMemo(() => {
+    const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+    if (videoRef.current && videoRef.current.currentTime > 0) return videoRef.current.currentTime;
+    if (lastPosition.current?.key === mediaKey) return lastPosition.current.time;
+    return initialTime ?? (theiaStore.getState().settings.autoResume && saved && !saved.completed ? saved.positionSeconds : 0);
+  }, [embedSession]);
+  const embedUrl = React.useMemo(() => {
+    if (!supportsEmbedProgress(stream)) return stream.url;
+    const url = new URL(stream.url);
+    url.searchParams.set('startAt', String(Math.floor(Math.max(0, embedStart))));
+    return url.href;
+  }, [embedSession, embedStart]);
+
+  useEffect(() => {
+    if (!supportsEmbedProgress(stream)) return;
+    let latest: ReturnType<typeof readEmbedProgress> = null;
+    let lastSave = 0;
+    let advanced = false;
+    const flush = () => {
+      if (!latest) return;
+      const percentage = latest.time / latest.duration * 100;
+      theiaStore.getState().updateProgress({
+        mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
+        positionSeconds: latest.time, durationSeconds: latest.duration, percentage,
+        completed: latest.ended || percentage > 92, updatedAt: Date.now(),
+      }, media);
+      lastSave = Date.now();
+    };
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== 'https://vidlink.pro' || event.source !== iframeRef.current?.contentWindow) return;
+      const expectedId = new URL(stream.url).pathname.split('/')[2];
+      if (event.data?.data?.mtmdbId !== undefined && String(event.data.data.mtmdbId) !== expectedId) return;
+      const progress = readEmbedProgress(event.data, episode);
+      if (!progress) return;
+      latest = progress;
+      lastPosition.current = { key: mediaKey, time: progress.time };
+      if (progress.event !== 'timeupdate' || Date.now() - lastSave >= 5000) flush();
+      if (progress.ended && !advanced && hasNextEpisode && theiaStore.getState().settings.autoPlayNext) {
+        advanced = true;
+        nextEpisodeCallback.current?.();
+      }
+    };
+    const hidden = () => { if (document.hidden) flush(); };
+    window.addEventListener('message', receive);
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      flush();
+      window.removeEventListener('message', receive);
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, [embedSession, media, episode, hasNextEpisode]);
 
   useEffect(() => {
     setSubtitleOffsetMs(theiaStore.getState().getSubtitleOffset(media.id));
@@ -391,10 +450,14 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         }}
       />
 
+      {stream.format === 'embed' && <p role="status" style={{ position: 'absolute', bottom: 12, left: 16, right: 16, zIndex: 40, background: '#09090bdd', padding: 10, pointerEvents: 'none' }}>
+        {supportsEmbedProgress(stream) ? 'Progress saves on this device. This server may prefer its own saved position; choose a direct server for precise resume and Start over.' : 'This server does not support progress saving. Choose a direct server to use Continue Watching.'}
+      </p>}
       {/* Media Element: Video or Iframe Embed */}
       {stream.format === 'embed' ? (
         <iframe
-          src={stream.url}
+          ref={iframeRef}
+          src={embedUrl}
           title={`${media.title} — ${stream.name}`}
           sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
           style={{ width: '100%', height: '100%', border: 'none' }}

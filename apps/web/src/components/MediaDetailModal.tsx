@@ -14,13 +14,15 @@ interface MediaDetailModalProps {
   media: MediaItem;
   isOpen: boolean;
   initialEpisodeId?: string;
+  resumeImmediately?: boolean;
   onClose: () => void;
-  onPlay: (media: MediaItem, stream: StreamSource, availableStreams: StreamSource[], episode?: Episode) => void;
+  onPlay: (media: MediaItem, stream: StreamSource, availableStreams: StreamSource[], episode?: Episode, initialTime?: number) => void;
 }
 
 export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   media: initialMedia,
   initialEpisodeId,
+  resumeImmediately = false,
   isOpen,
   onClose,
   onPlay,
@@ -85,7 +87,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
     setStreams([]);
     setSelectedStream(null);
     setHasResolvedStreams(false);
-    if (!isOpen || (media.type === 'series' && !selectedEpisode)) {
+    if (!isOpen || isLoadingDetails || (media.type === 'series' && !selectedEpisode)) {
       setIsResolvingStreams(false);
       return;
     }
@@ -112,17 +114,18 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
         if (!controller.signal.aborted) {
           setStreams(resolved);
-          const best = resolved.length > 0 ? resolved[0] : null;
+          const best = resolved.find(source => source.format !== 'embed') || resolved[0] || null;
           setSelectedStream(best);
           setIsResolvingStreams(false);
           setHasResolvedStreams(true);
 
           // If the user clicked Watch while streams were resolving in the background
-          if (pendingPlayRef.current) {
+          if (pendingPlayRef.current || resumeImmediately) {
             pendingPlayRef.current = false;
             setIsPendingPlay(false);
             if (best) {
-              onPlay(media, best, resolved, selectedEpisode);
+              const saved = theiaStore.getState().getProgress(media.id, selectedEpisode?.id);
+              onPlay(media, best, resolved, selectedEpisode, resumeImmediately && saved && !saved.completed ? saved.positionSeconds : undefined);
               onClose();
             }
           }
@@ -144,13 +147,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
       controller.abort();
       pendingPlayRef.current = false;
     };
-  }, [media.id, media.tmdbId, selectedEpisode?.id, isOpen, resolveAttempt]);
+  }, [media.id, media.tmdbId, selectedEpisode?.id, isOpen, resolveAttempt, isLoadingDetails, resumeImmediately]);
 
   if (!isOpen) return null;
 
-  const handleStartPlayback = () => {
+  const handleStartPlayback = (startOver = false) => {
     if (selectedStream) {
-      onPlay(media, selectedStream, streams, selectedEpisode);
+      onPlay(media, selectedStream, streams, selectedEpisode, startOver ? 0 : progress && !progress.completed ? progress.positionSeconds : undefined);
       onClose();
     } else if (isResolvingStreams) {
       pendingPlayRef.current = true;
@@ -235,6 +238,9 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {progress && !progress.completed && progress.positionSeconds > 0 && selectedStream && (
+          <button type="button" onClick={() => handleStartPlayback(true)} style={{ margin: 16 }}>Start over</button>
+        )}
         {/* Swipe Handle Indicator */}
         <div
           onPointerDown={handlePointerDownDrag}
@@ -372,7 +378,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             <button
               type="button"
               disabled={isNoStreamsAvailable || (media.type === 'series' && !selectedEpisode)}
-              onClick={handleStartPlayback}
+              onClick={() => handleStartPlayback()}
               style={{
                 flex: 1,
                 height: 54,
@@ -412,7 +418,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               ) : (
                 <>
                   <span>
-                    {progress && progress.percentage > 5 && !progress.completed
+                    {progress && progress.percentage > 1 && !progress.completed
                       ? `Resume (${Math.round(progress.percentage)}%) ▶`
                       : 'Watch Now ▶'}
                   </span>

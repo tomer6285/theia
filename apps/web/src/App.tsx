@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { MediaItem, StreamSource, Episode, theiaStore, providerManager } from '@theia/core';
+import { MediaItem, StreamSource, Episode, theiaStore, providerManager, getContinueWatching } from '@theia/core';
 import { useWatchState, TouchPill } from '@theia/ui';
 const VideoPlayer = lazy(() => import('@theia/player').then((module) => ({ default: module.VideoPlayer })));
 import { BottomNav, TabType } from './components/BottomNav';
@@ -20,7 +20,9 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [selectedEpisodeId, setSelectedEpisodeId] = useState<string>();
+  const [resumeImmediately, setResumeImmediately] = useState(false);
   const handleSelectMedia = (media: MediaItem, episodeId?: string) => {
+    setResumeImmediately(false);
     setSelectedMedia(media);
     setSelectedEpisodeId(episodeId);
   };
@@ -31,21 +33,24 @@ export const App: React.FC = () => {
     stream: StreamSource;
     availableStreams: StreamSource[];
     episode?: Episode;
+    initialTime?: number;
   } | null>(null);
 
-  const continueCount = history.filter((h) => !h.progress.completed && h.progress.percentage > 1).length;
+  const continueCount = getContinueWatching(history).length;
 
   const handleStartPlay = (
     media: MediaItem,
     stream: StreamSource,
     availableStreams: StreamSource[],
-    episode?: Episode
+    episode?: Episode,
+    initialTime?: number
   ) => {
     setActivePlayingSession({
       media,
       stream,
       availableStreams,
       episode,
+      initialTime,
     });
   };
 
@@ -101,6 +106,7 @@ export const App: React.FC = () => {
           stream={activePlayingSession.stream}
           availableStreams={activePlayingSession.availableStreams}
           episode={activePlayingSession.episode}
+          initialTime={activePlayingSession.initialTime}
           onBack={handleBack}
           onNextEpisode={handleNextEpisode}
           hasNextEpisode={hasNextEpisode}
@@ -147,7 +153,7 @@ export const App: React.FC = () => {
       {activeTab === 'continue' && (
         <ContinueWatchingView
           onSelectMedia={handleSelectMedia}
-          onQuickPlay={handleSelectMedia}
+          onQuickPlay={(media, episodeId) => { handleSelectMedia(media, episodeId); setResumeImmediately(true); }}
         />
       )}
 
@@ -172,6 +178,7 @@ export const App: React.FC = () => {
           key={selectedMedia.id}
           media={selectedMedia}
           initialEpisodeId={selectedEpisodeId}
+          resumeImmediately={resumeImmediately}
           isOpen={true}
           onClose={() => setSelectedMedia(null)}
           onPlay={handleStartPlay}
