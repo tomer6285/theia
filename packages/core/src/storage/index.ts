@@ -315,3 +315,5 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
 }));
 
 export const dionStore = theiaStore;
+
+export * from './continueWatching';

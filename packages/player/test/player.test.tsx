@@ -165,3 +165,26 @@ it('switches servers and lets Escape dismiss the picker without leaving playback
   expect(select).toHaveBeenCalledWith(other);
   expect(queryByRole('dialog', { name: 'Playback servers' })).toBeNull();
 });
+
+it('tracks only events from the active VidLink iframe and keeps its resume URL stable', () => {
+  theiaStore.getState().updateProgress({ mediaId: media.id, positionSeconds: 25, durationSeconds: 100,
+    percentage: 25, completed: false, updatedAt: Date.now() }, media);
+  const embed: StreamSource = { ...stream, provider: 'vidlink', format: 'embed', url: 'https://vidlink.pro/movie/123' };
+  const { container, unmount } = render(<VideoPlayerWeb media={media} stream={embed} />);
+  const frame = container.querySelector('iframe')!;
+  expect(frame.src).toContain('startAt=25');
+  const send = (origin: string, source: Window | null, currentTime = 45) => window.dispatchEvent(new MessageEvent('message', {
+    origin, source, data: { type: 'PLAYER_EVENT', data: { event: 'pause', currentTime, duration: 100, mediaType: 'movie', mtmdbId: 123 } },
+  }));
+  send('https://evil.example', frame.contentWindow);
+  send('https://vidlink.pro', window);
+  expect(theiaStore.getState().getProgress(media.id)?.positionSeconds).toBe(25);
+  send('https://vidlink.pro', frame.contentWindow, NaN);
+  expect(theiaStore.getState().getProgress(media.id)?.positionSeconds).toBe(25);
+  send('https://vidlink.pro', frame.contentWindow);
+  expect(theiaStore.getState().getProgress(media.id)?.positionSeconds).toBe(45);
+  expect(frame.src).toContain('startAt=25');
+  unmount();
+  send('https://vidlink.pro', null, 60);
+  expect(theiaStore.getState().getProgress(media.id)?.positionSeconds).toBe(45);
+});
