@@ -42,8 +42,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         height: 50,
         borderRadius: 16,
         backgroundColor: colors.bg.elevated,
-        border: `1.5px solid ${isFocused ? colors.accent.primary : colors.border.subtle}`,
-        boxShadow: isFocused ? `0 0 16px ${colors.accent.primary}33` : '0 2px 8px rgba(0,0,0,0.3)',
+        border: `1px solid ${isFocused ? colors.border.default : colors.border.subtle}`,
+        boxShadow: 'none',
         padding: '0 16px',
         boxSizing: 'border-box',
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -53,7 +53,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       <span
         style={{
           fontSize: '18px',
-          color: isFocused ? colors.accent.primary : colors.text.muted,
+          color: colors.text.muted,
           marginRight: 12,
           userSelect: 'none',
           display: 'flex',
