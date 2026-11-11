@@ -36,14 +36,55 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 
   // Player state
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState<string | null>(null);
+  type SafariDocument = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void | Promise<void> };
+  type SafariContainer = HTMLDivElement & { webkitRequestFullscreen?: () => void | Promise<void> };
+  type SafariVideo = HTMLVideoElement & {
+    webkitEnterFullscreen?: () => void;
+    webkitExitFullscreen?: () => void;
+    webkitDisplayingFullscreen?: boolean;
+  };
   useEffect(() => {
-    const update = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    const doc = document as SafariDocument;
+    const video = videoRef.current as SafariVideo | null;
+    const update = () => {
+      setIsFullscreen((doc.fullscreenElement ?? doc.webkitFullscreenElement) === containerRef.current
+        || !!video?.webkitDisplayingFullscreen);
+      setFullscreenError(null);
+    };
+    const failed = () => setFullscreenError('Fullscreen could not start. Try again or use another browser.');
     document.addEventListener('fullscreenchange', update);
-    return () => document.removeEventListener('fullscreenchange', update);
-  }, []);
-  const toggleFullscreen = () => {
-    const action = document.fullscreenElement ? document.exitFullscreen() : containerRef.current?.requestFullscreen?.();
-    void action?.catch(() => {});
+    document.addEventListener('webkitfullscreenchange', update);
+    document.addEventListener('fullscreenerror', failed);
+    document.addEventListener('webkitfullscreenerror', failed);
+    video?.addEventListener('webkitbeginfullscreen', update);
+    video?.addEventListener('webkitendfullscreen', update);
+    update();
+    return () => {
+      document.removeEventListener('fullscreenchange', update);
+      document.removeEventListener('webkitfullscreenchange', update);
+      document.removeEventListener('fullscreenerror', failed);
+      document.removeEventListener('webkitfullscreenerror', failed);
+      video?.removeEventListener('webkitbeginfullscreen', update);
+      video?.removeEventListener('webkitendfullscreen', update);
+    };
+  }, [stream.format]);
+  const toggleFullscreen = async () => {
+    const doc = document as SafariDocument;
+    const container = containerRef.current as SafariContainer | null;
+    const video = videoRef.current as SafariVideo | null;
+    setFullscreenError(null);
+    try {
+      if (doc.fullscreenElement) await doc.exitFullscreen();
+      else if (doc.webkitFullscreenElement && doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+      else if (video?.webkitDisplayingFullscreen && video.webkitExitFullscreen) video.webkitExitFullscreen();
+      else if (container?.requestFullscreen) await container.requestFullscreen();
+      else if (container?.webkitRequestFullscreen) await container.webkitRequestFullscreen();
+      else if (video?.webkitEnterFullscreen) video.webkitEnterFullscreen();
+      else setFullscreenError('Fullscreen is not supported in this browser.');
+    } catch {
+      setFullscreenError('Fullscreen could not start. Try again or use another browser.');
+    }
   };
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -370,7 +411,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       onKeyDownCapture={() => { if (!isLocked) setIsHUDVisible(true); }}
       onKeyDown={(event) => {
         if ((event.target as HTMLElement).closest('button, input, select, [role="slider"], [role="dialog"]')) return;
-        if (event.key === 'Escape') { onBack?.(); return; }
+        if (event.key === 'Escape') { if (!isFullscreen) onBack?.(); return; }
         if (isLocked) return;
         if (event.key === ' ' || event.key === 'k') { event.preventDefault(); handleTogglePlay(); }
         if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && videoRef.current) {
@@ -522,6 +563,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
           </div>
         </div>
       )}
+      {fullscreenError && <div role="status" className="player-notice">{fullscreenError}</div>}
       {subtitles.error && <div role="status" className="player-notice">{subtitles.error}</div>}
       {isBuffering && !playbackError && stream.format !== 'embed' && (
         <div className="player-buffering" role="status">

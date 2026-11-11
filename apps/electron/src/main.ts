@@ -3,6 +3,7 @@ import { app, BrowserWindow, dialog, session } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { startDesktopProxy } from './proxy';
+import { allowPlayerPermission } from './permissions';
 
 let mainWindow: BrowserWindow | null = null;
 let desktopProxy: Awaited<ReturnType<typeof startDesktopProxy>>;
@@ -80,7 +81,12 @@ function createWindow() {
       event.preventDefault();
     }
   });
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  // Embeds share this WebContents. Permit their fullscreen requests too, while
+  // retaining the default denial for all other permissions and documents.
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
+    callback(allowPlayerPermission(permission, contents, mainWindow?.webContents ?? null,
+      pathToFileURL(indexPath).href, !app.isPackaged));
+  });
 
   if (app.isPackaged || process.env.NODE_ENV === 'production') {
     mainWindow.loadFile(indexPath);

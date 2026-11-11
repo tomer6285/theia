@@ -139,6 +139,63 @@ describe('cinema controls', () => {
     expect(video.volume).toBeGreaterThan(0);
   });
 
+  it('reports rejected and unsupported fullscreen requests', async () => {
+    const { container, getByRole, getByText } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    fireEvent.click(getByRole('button', { name: 'Enter fullscreen' }));
+    expect(getByText('Fullscreen is not supported in this browser.')).toBeTruthy();
+    Object.defineProperty(container.querySelector('.video-player'), 'requestFullscreen', {
+      value: vi.fn().mockRejectedValue(new Error('Denied')),
+    });
+    fireEvent.click(getByRole('button', { name: 'Enter fullscreen' }));
+    await waitFor(() => expect(getByText(/Fullscreen could not start/)).toBeTruthy());
+  });
+
+  it('tracks fullscreen changes and exits without navigating back', async () => {
+    const back = vi.fn();
+    const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} onBack={back} />);
+    const player = container.querySelector('.video-player')!;
+    const exit = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => player });
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit });
+    fireEvent(document, new Event('fullscreenchange'));
+    fireEvent.keyDown(player, { key: 'Escape' });
+    expect(back).not.toHaveBeenCalled();
+    fireEvent.click(getByRole('button', { name: 'Exit fullscreen' }));
+    expect(exit).toHaveBeenCalledOnce();
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => null });
+    fireEvent(document, new Event('fullscreenchange'));
+    expect(getByRole('button', { name: 'Enter fullscreen' })).toBeTruthy();
+    delete (document as Document & { exitFullscreen?: unknown }).exitFullscreen;
+  });
+
+  it('supports prefixed Safari container fullscreen and reports fullscreenerror events', () => {
+    const { container, getByRole, getByText } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const request = vi.fn();
+    Object.defineProperty(container.querySelector('.video-player'), 'webkitRequestFullscreen', { value: request });
+    fireEvent.click(getByRole('button', { name: 'Enter fullscreen' }));
+    expect(request).toHaveBeenCalledOnce();
+    fireEvent(container.querySelector('.video-player')!, new Event('fullscreenerror', { bubbles: true }));
+    expect(getByText(/Fullscreen could not start/)).toBeTruthy();
+  });
+
+  it('uses native video fullscreen on iPhone Safari and tracks native exit', () => {
+    const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const video = container.querySelector('video')!;
+    const enter = vi.fn();
+    Object.defineProperties(video, {
+      webkitEnterFullscreen: { value: enter },
+      webkitDisplayingFullscreen: { configurable: true, value: false },
+    });
+    fireEvent.click(getByRole('button', { name: 'Enter fullscreen' }));
+    expect(enter).toHaveBeenCalledOnce();
+    Object.defineProperty(video, 'webkitDisplayingFullscreen', { value: true });
+    fireEvent(video, new Event('webkitbeginfullscreen'));
+    expect(getByRole('button', { name: 'Exit fullscreen' })).toBeTruthy();
+    Object.defineProperty(video, 'webkitDisplayingFullscreen', { value: false });
+    fireEvent(video, new Event('webkitendfullscreen'));
+    expect(getByRole('button', { name: 'Enter fullscreen' })).toBeTruthy();
+  });
+
   it('requests fullscreen on the player container', () => {
     const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} />);
     const request = vi.fn().mockResolvedValue(undefined);
