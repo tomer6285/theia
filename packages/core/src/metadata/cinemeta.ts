@@ -1,6 +1,21 @@
 import { fetchWithTimeout } from '../network/request';
 import { MediaItem, MediaType, Episode, SeasonInfo } from '../types';
 
+function normalizeTitle(title: string): string {
+  return title.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+function titleRelevance(title: string, query: string): number {
+  const normalized = normalizeTitle(title);
+  if (normalized === query) return 0;
+  if (normalized.startsWith(`${query} `)) return 1;
+  if (` ${normalized} `.includes(` ${query} `)) return 2;
+  const words = new Set(normalized.split(' '));
+  if (query.split(' ').every((word) => words.has(word))) return 3;
+  return 4;
+}
+
 export class CinemetaClient {
   private baseUrl = 'https://v3-cinemeta.strem.io';
 
@@ -12,9 +27,7 @@ export class CinemetaClient {
     if (!trimmed) return [];
 
     const typesToFetch: MediaType[] = type ? [type] : ['movie', 'series'];
-    const results: MediaItem[] = [];
-
-    await Promise.all(
+    const groups = await Promise.all(
       typesToFetch.map(async (t) => {
         try {
           const url = `${this.baseUrl}/catalog/${t}/top/search=${encodeURIComponent(trimmed)}.json`;
@@ -22,11 +35,8 @@ export class CinemetaClient {
           if (!res.ok) return;
           const data = (await res.json()) as { metas?: any[] };
           if (data && Array.isArray(data.metas)) {
-            for (const meta of data.metas) {
-              if (meta && (meta.imdb_id || meta.id)) {
-                results.push(this.formatMetaItem(meta, t));
-              }
-            }
+            return data.metas.filter((meta) => meta && (meta.imdb_id || meta.id))
+              .map((meta) => this.formatMetaItem(meta, t));
           }
         } catch (err) {
           console.error(`Error searching Cinemeta for ${t}:`, err);
@@ -34,7 +44,14 @@ export class CinemetaClient {
       })
     );
 
-    results.sort((a, b) => typesToFetch.indexOf(a.type) - typesToFetch.indexOf(b.type));
+    const normalizedQuery = normalizeTitle(trimmed);
+    // Interleave equally relevant source results by their original rank, so neither
+    // media type nor request completion time can bury the other source's top hits.
+    const ranked = groups.flatMap((items) => (items ?? []).map((item, rank) => ({
+      item, rank, relevance: normalizedQuery ? titleRelevance(item.title, normalizedQuery) : 4,
+    })));
+    ranked.sort((a, b) => a.relevance - b.relevance || a.rank - b.rank);
+    const results = ranked.map(({ item }) => item);
     return Array.from(new Map(results.map((item) => [item.id, item])).values());
   }
 
