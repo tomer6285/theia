@@ -35,6 +35,7 @@ export interface WatchState {
     media: MediaItem;
     progress: WatchProgress;
     lastWatchedAt: number;
+    dismissedFromContinueWatching?: boolean;
   }>;
   favorites: MediaItem[];
   subtitleOffsets: Record<string, number>;
@@ -48,6 +49,8 @@ export interface WatchState {
   getSubtitleOffset: (mediaId: string) => number;
   updateSettings: (settings: Partial<UserSettings>) => void;
   clearHistory: () => void;
+  removeHistoryEntry: (mediaId: string, episodeId?: string) => void;
+  dismissContinueWatching: (mediaId: string) => void;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -105,7 +108,7 @@ function parseStoredState(raw: unknown): Partial<PersistedState> {
         ? Object.fromEntries(Object.entries(parsed.progress).filter(([, value]) => isProgress(value))) : {},
       history: Array.isArray(parsed.history) ? parsed.history.filter((h) =>
         isRecord(h) && isMedia(h.media) && isProgress(h.progress) && Number.isFinite(h.lastWatchedAt)
-      ).sort((a, b) => b.lastWatchedAt - a.lastWatchedAt).slice(0, 50) : [],
+      ).sort((a, b) => b.lastWatchedAt - a.lastWatchedAt) : [],
       favorites: Array.isArray(parsed.favorites) ? parsed.favorites.filter(isMedia) : [],
       subtitleOffsets: isRecord(parsed.subtitleOffsets)
         ? Object.fromEntries(Object.entries(parsed.subtitleOffsets).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) : {},
@@ -215,9 +218,6 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
           newHistory.unshift(historyItem);
         }
 
-        if (newHistory.length > 50) {
-          newHistory = newHistory.slice(0, 50);
-        }
       }
 
       const newState = {
@@ -297,6 +297,29 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
         settings: updated,
       });
       return { settings: updated };
+    });
+  },
+
+  dismissContinueWatching: (mediaId) => {
+    set((state) => {
+      const history = state.history.map((item) => item.media.id === mediaId
+        ? { ...item, dismissedFromContinueWatching: true } : item);
+      saveState({ ...state, history });
+      return { history };
+    });
+  },
+
+  removeHistoryEntry: (mediaId, episodeId) => {
+    set((state) => {
+      const history = state.history.filter((item) =>
+        !(item.media.id === mediaId && item.progress.episodeId === episodeId)
+      ).map((item) => item.media.id === mediaId
+        ? { ...item, dismissedFromContinueWatching: true } : item);
+      const progress = { ...state.progress };
+      const key = episodeId || mediaId;
+      if (progress[key]?.mediaId === mediaId) delete progress[key];
+      saveState({ ...state, history, progress });
+      return { history, progress };
     });
   },
 

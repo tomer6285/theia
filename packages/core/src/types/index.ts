@@ -93,6 +93,7 @@ export interface WatchProgress {
 }
 
 export interface WatchHistoryItem {
+  dismissedFromContinueWatching?: boolean;
   media: MediaItem;
   progress: WatchProgress;
   lastWatchedAt: number;
