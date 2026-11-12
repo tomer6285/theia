@@ -381,6 +381,38 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     }
   };
 
+  // Capture shortcuts before focused buttons can turn Space into another click.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
+      const player = containerRef.current;
+      if (!player || (target !== document.body && target !== document.documentElement && !player.contains(target))) return;
+      if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="dialog"]')) return;
+      if (isLocked || isSubModalOpen || isStreamSelectorOpen) return;
+      const key = event.key.toLowerCase();
+      if (![' ', 'k', 'f', 'arrowleft', 'arrowright'].includes(key)) return;
+      if (key !== 'f' && !videoRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setIsHUDVisible(true);
+      setHudActivity((value) => value + 1);
+      if (key === 'f') {
+        if (!event.repeat) void toggleFullscreen();
+      } else if (key === ' ' || key === 'k') {
+        if (!event.repeat) handleTogglePlay();
+      } else {
+        const video = videoRef.current!;
+        const end = Number.isFinite(video.duration) ? video.duration : Infinity;
+        const time = Math.max(0, Math.min(end, video.currentTime + (key === 'arrowleft' ? -10 : 10)));
+        video.currentTime = time;
+        setCurrentTime(time);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  });
+
   const formatTime = (secs: number) => {
     const s = Math.floor(Number.isFinite(secs) ? Math.max(0, secs) : 0);
     const m = Math.floor(s / 60);
@@ -414,14 +446,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       onKeyDown={(event) => {
         if ((event.target as HTMLElement).closest('button, input, select, [role="slider"], [role="dialog"]')) return;
         if (event.key === 'Escape') { if (!isFullscreen) onBack?.(); return; }
-        if (isLocked) return;
-        if (event.key === ' ' || event.key === 'k') { event.preventDefault(); handleTogglePlay(); }
-        if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && videoRef.current) {
-          event.preventDefault();
-          videoRef.current.currentTime = Math.max(0, Math.min(duration,
-            videoRef.current.currentTime + (event.key === 'ArrowLeft' ? -10 : 10)));
-        }
-        setIsHUDVisible(true);
+
       }}
       style={{
         position: 'relative',

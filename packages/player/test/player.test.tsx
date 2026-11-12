@@ -292,3 +292,63 @@ it('applies credits timing to supported embed progress', () => {
   expect(theiaStore.getState().getProgress(media.id)).toMatchObject({ positionSeconds: 85, completed: true });
   expect(getContinueWatching(theiaStore.getState().history)).toEqual([]);
 });
+
+
+describe('watcher keyboard shortcuts', () => {
+  it('seeks from the page and focused buttons, clamping to the video bounds', () => {
+    const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const video = container.querySelector('video')!;
+    setupVideo(video);
+    video.currentTime = 45;
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+    expect(video.currentTime).toBe(55);
+    const mute = getByRole('button', { name: 'Mute' });
+    mute.focus();
+    fireEvent.keyDown(mute, { key: 'ArrowLeft' });
+    expect(video.currentTime).toBe(45);
+    video.currentTime = 95;
+    fireEvent.keyDown(mute, { key: 'ArrowRight' });
+    expect(video.currentTime).toBe(100);
+    video.currentTime = 5;
+    fireEvent.keyDown(mute, { key: 'ArrowLeft' });
+    expect(video.currentTime).toBe(0);
+  });
+
+  it('uses Space for playback after a control is focused and ignores held toggle keys', () => {
+    const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const video = container.querySelector('video')!;
+    const mute = getByRole('button', { name: 'Mute' });
+    mute.focus();
+    fireEvent.play(video);
+    expect(fireEvent.keyDown(mute, { key: ' ' })).toBe(false);
+    expect(video.pause).toHaveBeenCalledOnce();
+    expect(video.volume).toBe(1);
+    fireEvent.keyDown(mute, { key: ' ' });
+    expect(video.play).toHaveBeenCalledOnce();
+    fireEvent.keyDown(mute, { key: ' ', repeat: true });
+    expect(video.play).toHaveBeenCalledOnce();
+  });
+
+  it('toggles fullscreen with f and cleans up the page shortcut on unmount', () => {
+    const { container, unmount } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const request = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(container.querySelector('.video-player'), 'requestFullscreen', { value: request });
+    fireEvent.keyDown(document.body, { key: 'f' });
+    expect(request).toHaveBeenCalledOnce();
+    fireEvent.keyDown(document.body, { key: 'f', repeat: true });
+    expect(request).toHaveBeenCalledOnce();
+    unmount();
+    expect(fireEvent.keyDown(document.body, { key: 'f' })).toBe(true);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it('preserves slider keys and modified browser shortcuts', () => {
+    const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream} />);
+    const video = container.querySelector('video')!;
+    setupVideo(video);
+    video.currentTime = 40;
+    expect(fireEvent.keyDown(getByRole('slider', { name: 'Volume' }), { key: 'ArrowRight' })).toBe(true);
+    expect(fireEvent.keyDown(document.body, { key: 'ArrowLeft', altKey: true })).toBe(true);
+    expect(video.currentTime).toBe(40);
+  });
+});
