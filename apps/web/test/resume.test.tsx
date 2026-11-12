@@ -34,3 +34,29 @@ it('shows a recoverable empty state when resume cannot find streams', async () =
   await screen.findByText('No Streams Found');
   expect(play).not.toHaveBeenCalled();
 });
+
+it('skips the details sheet while quick resume is resolving', async () => {
+  let resolve!: (streams: StreamSource[]) => void;
+  vi.mocked(providerManager.resolveStreams).mockImplementation(() => new Promise(done => { resolve = done; }));
+  const play = vi.fn();
+  render(<MediaDetailModal media={media} isOpen onClose={vi.fn()} onPlay={play} resumeImmediately />);
+  expect(screen.getByRole('status').textContent).toBe('Resuming Movie…');
+  expect(screen.queryByRole('button', { name: /Watch Now|Resume/ })).toBeNull();
+  expect(screen.queryByText('Source')).toBeNull();
+  resolve([embed, direct]);
+  await waitFor(() => expect(play).toHaveBeenCalledWith(media, direct, [embed, direct], undefined, 45));
+});
+
+it('cancels quick resume and aborts stream resolution', () => {
+  let signal: AbortSignal | undefined;
+  vi.mocked(providerManager.resolveStreams).mockImplementation(query => {
+    signal = query.signal;
+    return new Promise(() => {});
+  });
+  const close = vi.fn();
+  const { unmount } = render(<MediaDetailModal media={media} isOpen onClose={close} onPlay={vi.fn()} resumeImmediately />);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(close).toHaveBeenCalledOnce();
+  unmount();
+  expect(signal?.aborted).toBe(true);
+});

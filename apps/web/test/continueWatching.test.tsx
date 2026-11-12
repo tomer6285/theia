@@ -88,3 +88,12 @@ it('opens on touch hold without selecting the title, and cancels a scrolling ges
     expect(select).not.toHaveBeenCalled();
   } finally { vi.useRealTimers(); }
 });
+
+it('opens details from the title without starting playback', () => {
+  const select = vi.fn();
+  const play = vi.fn();
+  render(<ContinueWatchingView onSelectMedia={select} onQuickPlay={play} />);
+  fireEvent.click(screen.getByRole('button', { name: 'View Example Show' }));
+  expect(select).toHaveBeenCalledWith(media, 'ep1');
+  expect(play).not.toHaveBeenCalled();
+});

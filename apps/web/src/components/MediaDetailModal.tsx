@@ -197,6 +197,21 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
   const isNoStreamsAvailable = hasResolvedStreams && streams.length === 0;
 
+  // Quick resume skips the details sheet while finding a playable stream.
+  // Keep the sheet available when resolution fails so the user can retry.
+  if (resumeImmediately && !hasResolvedStreams &&
+    (media.type !== 'series' || selectedEpisode || isLoadingDetails)) {
+    return (
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Resuming ${media.title}`}
+        tabIndex={-1} style={{ position: 'fixed', inset: 0, zIndex: 100,
+          backgroundColor: colors.bg.surface, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <p role="status">Resuming {media.title}…</p>
+        <TouchPill label="Cancel" onClick={onClose} />
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
