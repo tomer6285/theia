@@ -98,7 +98,18 @@ button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 button:disabled { cursor: not-allowed; }
 /* SearchBar supplies a subtle neutral focus border on its container. */
-:focus-visible:not(.theia-search-input) { outline: 2px solid #22d3ee !important; outline-offset: 4px; }
+:focus-visible:not(.theia-search-input):not(.media-card) { outline: 2px solid #22d3ee !important; outline-offset: 4px; }
+.media-card:focus { outline: none; }
+.media-card-poster { transition: box-shadow .15s ease; }
+html:not([data-input-modality="pointer"]) .media-card:focus-visible > .media-card-poster {
+  outline: 2px solid #22d3ee;
+  outline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .media-card:hover > .media-card-poster {
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .4), 0 0 16px rgba(34, 211, 238, .16) !important;
+  }
+}
 input:focus-visible, textarea:focus-visible { outline-offset: 2px; }
 .app-content { width: 100%; max-width: 1320px; margin-inline: auto; }
 .app-content > div:first-child { padding-top: max(24px, env(safe-area-inset-top)); }
@@ -109,8 +120,8 @@ input:focus-visible, textarea:focus-visible { outline-offset: 2px; }
 .view-description { color: #a1a1aa; line-height: 1.6; }
 .catalog-section { margin-bottom: 32px; }
 .catalog-section h2 { font-size: 20px; font-weight: 750; margin-bottom: 18px; letter-spacing: -.3px; }
-.catalog-rail { gap: 18px; padding: 4px 4px 16px; margin-inline: -4px; }
-.catalog-rail > * { flex-shrink: 0; scroll-snap-align: start; }
+.catalog-rail { gap: 18px; padding: 4px 4px 16px; margin-inline: -4px; scroll-snap-type: none; scroll-behavior: auto; }
+.catalog-rail > * { flex-shrink: 0; }
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); gap: 20px; }
 .result-count { color: #a1a1aa; font-size: 15px; margin-left: 8px; }
 .empty-state { padding: 40px 24px; text-align: center; border: 1px solid #27272a; border-radius: 20px; background: #121216; }
