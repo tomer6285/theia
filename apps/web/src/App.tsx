@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { MediaItem, StreamSource, Episode, theiaStore, providerManager, getContinueWatching } from '@theia/core';
-import { useWatchState, TouchPill } from '@theia/ui';
+import { MediaItem, StreamSource, Episode, theiaStore, providerManager } from '@theia/core';
+import { TouchPill } from '@theia/ui';
 const VideoPlayer = lazy(() => import('@theia/player').then((module) => ({ default: module.VideoPlayer })));
 import { BottomNav, TabType } from './components/BottomNav';
 import { HomeView } from './components/HomeView';
@@ -12,7 +12,6 @@ import { SettingsView } from './components/SettingsView';
 import { MediaDetailModal } from './components/MediaDetailModal';
 
 export const App: React.FC = () => {
-  const { history } = useWatchState();
   const [nextLoading, setNextLoading] = useState(false);
   const [nextError, setNextError] = useState('');
   const nextController = useRef<AbortController | null>(null);
@@ -35,8 +34,6 @@ export const App: React.FC = () => {
     episode?: Episode;
     initialTime?: number;
   } | null>(null);
-
-  const continueCount = getContinueWatching(history).length;
 
   const handleStartPlay = (
     media: MediaItem,
@@ -169,7 +166,6 @@ export const App: React.FC = () => {
       <BottomNav
         activeTab={activeTab}
         onChangeTab={(tab) => setActiveTab(tab)}
-        continueCount={continueCount}
       />
 
       {/* Media Detail & Stream Resolver Modal with Swipe-down Dismiss */}

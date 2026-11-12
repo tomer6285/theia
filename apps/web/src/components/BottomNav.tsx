@@ -6,19 +6,17 @@ export type TabType = 'home' | 'movies' | 'shows' | 'continue' | 'library' | 'se
 interface BottomNavProps {
   activeTab: TabType;
   onChangeTab: (tab: TabType) => void;
-  continueCount?: number;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onChangeTab,
-  continueCount = 0,
 }) => {
-  const tabs: Array<{ id: TabType; label: string; icon: string; badge?: number }> = [
+  const tabs: Array<{ id: TabType; label: string; icon: string }> = [
     { id: 'home', label: 'Home', icon: '🏠' },
     { id: 'movies', label: 'Movies', icon: '🎬' },
     { id: 'shows', label: 'Shows', icon: '📺' },
-    { id: 'continue', label: 'Continue', icon: '⏱️', badge: continueCount },
+    { id: 'continue', label: 'Continue', icon: '⏱️' },
     { id: 'library', label: 'Library', icon: '📚' },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
   ];
@@ -119,30 +117,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 />
               )}
 
-              {/* Badge for Continue Watching */}
-              {tab.badge !== undefined && tab.badge > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 'calc(50% - 18px)',
-                    backgroundColor: colors.accent.primary,
-                    color: '#000000',
-                    fontSize: '9px',
-                    fontWeight: 900,
-                    borderRadius: '9999px',
-                    minWidth: 15,
-                    height: 15,
-                    padding: '0 3px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: `0 0 8px ${colors.accent.primary}88`,
-                  }}
-                >
-                  {tab.badge}
-                </span>
-              )}
             </button>
           );
         })}

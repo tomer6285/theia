@@ -37,6 +37,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
   return (
     <div
+      className="media-card"
       role="button"
       tabIndex={0}
       aria-label={`View ${media.title}`}
@@ -65,6 +66,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     >
       {/* Poster Container */}
       <div
+        className="media-card-poster"
         style={{
           position: 'relative',
           width: '100%',
