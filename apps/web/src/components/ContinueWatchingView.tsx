@@ -3,10 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { theiaStore, MediaItem, getContinueWatching, CONTINUE_WATCHING_MAX_AGE_MS } from '@theia/core';
 import { colors, MediaCard } from '@theia/ui';
 
-const optionStyle: React.CSSProperties = {
-  background: 'none', border: 'none', color: colors.text.primary, textAlign: 'left',
-  padding: '10px 8px', minHeight: 44, cursor: 'pointer', fontSize: 12,
-};
+import { ContinueWatchingActions } from './ContinueWatchingActions';
 
 interface ContinueWatchingViewProps {
   onSelectMedia: (media: MediaItem, episodeId?: string) => void;
@@ -90,18 +87,16 @@ export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSe
               ? `S${season} E${episodeNumber}` : '';
             const percentage = nextEpisode ? 0 : Math.min(100, Math.max(0, progress.percentage));
             const resume = () => (onQuickPlay || onSelectMedia)(media, episodeId);
-            const isFavorite = theiaStore.getState().isFavorite(media.id);
             return (
-              <div key={media.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+              <ContinueWatchingActions key={media.id} media={media}>
                 <MediaCard media={media} variant="continue" width="100%"
                   onPress={() => onSelectMedia(media, episodeId)} />
-                {episode?.title && (
-                  <div style={{ fontSize: 13, color: colors.text.secondary }}>{episode.title}</div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: colors.text.secondary }}>
-                  <span>{nextEpisode ? 'Up next' : episodeLabel || `${Math.round(percentage)}% watched`}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12,
+                  fontSize: 13, color: colors.text.secondary, minWidth: 0 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    title={episode?.title}>{episode?.title || (nextEpisode ? 'Up next' : 'In progress')}</span>
                   {!nextEpisode && progress.durationSeconds > 0 && (
-                    <span>{formatRemaining(progress.durationSeconds, progress.positionSeconds)}</span>
+                    <span style={{ flexShrink: 0 }}>{formatRemaining(progress.durationSeconds, progress.positionSeconds)}</span>
                   )}
                 </div>
                 <div role="progressbar" aria-label={`${media.title} playback progress`}
@@ -115,17 +110,7 @@ export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSe
                     color: colors.text.inverse, fontSize: 13, fontWeight: 750, cursor: 'pointer' }}>
                   <span aria-hidden="true">▶ </span>{nextEpisode ? 'Play' : 'Resume'}{episodeLabel ? ` ${episodeLabel}` : ''}
                 </button>
-                <details style={{ position: 'relative', fontSize: 12, color: colors.text.secondary }}>
-                  <summary aria-label={`More options for ${media.title}`} style={{ cursor: 'pointer', padding: '6px 0' }}>More options</summary>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 8,
-                    backgroundColor: colors.bg.surface, border: `1px solid ${colors.border.subtle}`, borderRadius: 10 }}>
-                    <button type="button" onClick={() => theiaStore.getState().toggleFavorite(media)}
-                      style={optionStyle}>{isFavorite ? 'Remove from favorites' : 'Add to favorites'}</button>
-                    <button type="button" onClick={() => theiaStore.getState().dismissContinueWatching(media.id)}
-                      style={optionStyle}>Remove from Continue Watching</button>
-                  </div>
-                </details>
-              </div>
+              </ContinueWatchingActions>
             );
           })}
         </div>
