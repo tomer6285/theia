@@ -144,18 +144,28 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia, onQuick
               }}
             >
               {history.map(({ media, progress }) => (
-                <MediaCard
-                  key={progress.episodeId || media.id}
-                  media={media}
-                  width="100%"
-                  onPress={() => onSelectMedia(media, progress.episodeId)}
-                  onQuickPlay={() => onSelectMedia(media, progress.episodeId)}
-                  progress={progress}
-                  isFavorite={theiaStore.getState().isFavorite(media.id)}
-                  onToggleFavorite={() => {
-                    theiaStore.getState().toggleFavorite(media);
-                      }}
-                />
+                <div key={`${media.id}:${progress.episodeId || ''}`} style={{ minWidth: 0 }}>
+                  <MediaCard
+                    media={media}
+                    width="100%"
+                    onPress={() => onSelectMedia(media, progress.episodeId)}
+                    onQuickPlay={() => onSelectMedia(media, progress.episodeId)}
+                    progress={progress}
+                    isFavorite={theiaStore.getState().isFavorite(media.id)}
+                    onToggleFavorite={() => {
+                      theiaStore.getState().toggleFavorite(media);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Remove ${media.title}${progress.episodeId ? ` episode ${progress.episodeId}` : ''} from History`}
+                    onClick={() => theiaStore.getState().removeHistoryEntry(media.id, progress.episodeId)}
+                    style={{ background: 'none', border: 'none', color: colors.status.danger,
+                      minHeight: 44, cursor: 'pointer', padding: '8px 0' }}
+                  >
+                    Remove from History
+                  </button>
+                </div>
               ))}
             </div>
           )}

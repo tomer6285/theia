@@ -4,6 +4,7 @@ import { colors } from '../theme/colors';
 
 export interface MediaCardProps {
   media: MediaItem;
+  variant?: 'browse' | 'continue';
   progress?: WatchProgress;
   onPress: (media: MediaItem) => void;
   onToggleFavorite?: (media: MediaItem) => void;
@@ -14,6 +15,7 @@ export interface MediaCardProps {
 
 export const MediaCard: React.FC<MediaCardProps> = ({
   media,
+  variant = 'browse',
   progress,
   onPress,
   onToggleFavorite,
@@ -87,7 +89,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         )}
 
         {/* Rating Badge */}
-        {media.rating && (
+        {variant === 'browse' && media.rating && (
           <div
             style={{
               position: 'absolute',
@@ -189,7 +191,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         )}
 
         {/* Type Badge (Movie / Series) */}
-        <div
+        {variant === 'browse' && <div
           style={{
             position: 'absolute',
             bottom: hasProgress ? 12 : 8,
@@ -207,7 +209,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           }}
         >
           {media.type}
-        </div>
+        </div>}
 
         {/* Progress Bar (if in watch progress) */}
         {hasProgress && (
@@ -248,7 +250,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         >
           {media.title}
         </div>
-        <div
+        {variant === 'browse' && <div
           style={{
             fontSize: '12px',
             color: colors.text.muted,
@@ -267,7 +269,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               </span>
             </>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );
