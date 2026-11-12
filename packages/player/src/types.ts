@@ -2,7 +2,14 @@ import { StreamSource, MediaItem, Episode, SubtitleTrack } from '@theia/core';
 
 export type AspectRatioMode = 'fit' | 'fill' | '16:9';
 
+export interface CompletionPolicy {
+  minimumPercentage: number;
+  movieRemainingSeconds: number;
+  episodeRemainingSeconds: number;
+}
+
 export interface VideoPlayerProps {
+  completionPolicy?: Partial<CompletionPolicy>;
   stream: StreamSource;
   availableStreams?: StreamSource[];
   media: MediaItem;

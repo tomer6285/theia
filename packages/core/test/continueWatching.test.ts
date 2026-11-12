@@ -15,6 +15,23 @@ const item = (episodeId: string, lastWatchedAt: number, completed = false): Watc
 it('keeps one entry per series using latest activity even when input is unsorted', () => {
   expect(getContinueWatching([item('one', 1), item('two', 2)]).map(x => x.progress.episodeId)).toEqual(['two']);
 });
+it.each([2, 30])('includes positive saved positions at or below 1%% (%s seconds)', (positionSeconds) => {
+  const entry = item('one', 1);
+  entry.progress = { ...entry.progress, positionSeconds, durationSeconds: 3000, percentage: positionSeconds / 3000 * 100 };
+  expect(getContinueWatching([entry])).toEqual([entry]);
+});
+it('keeps the show visible when the latest episode has only just started', () => {
+  const earlier = item('one', 1);
+  earlier.progress = { ...earlier.progress, positionSeconds: 1200, durationSeconds: 3000, percentage: 40 };
+  const latest = item('two', 2);
+  latest.progress = { ...latest.progress, positionSeconds: 2, durationSeconds: 3000, percentage: 2 / 3000 * 100 };
+  expect(getContinueWatching([earlier, latest])).toEqual([latest]);
+});
+it('excludes zero saved positions even if the stored percentage is positive', () => {
+  const entry = item('one', 1);
+  entry.progress.positionSeconds = 0;
+  expect(getContinueWatching([entry])).toEqual([]);
+});
 it('offers the next season after completion and never resurrects earlier episodes at the finale', () => {
   expect(getContinueWatching([item('one', 2, true)])[0].nextEpisode?.id).toBe('two');
   expect(getContinueWatching([item('two', 3, true), item('one', 1)])).toEqual([]);
@@ -61,4 +78,13 @@ it('retains more than 50 history entries across saving and hydration, including 
   expect(theiaStore.getState().history).toHaveLength(64);
   expect(theiaStore.getState().progress.ep64).toBeUndefined();
   expect(getContinueWatching(theiaStore.getState().history)).toEqual([]);
+});
+
+it('applies dismissal and expiry to titles with newly started playback', () => {
+  const entry = item('one', 100);
+  entry.progress = { ...entry.progress, positionSeconds: 2, durationSeconds: 3000, percentage: 2 / 3000 * 100 };
+  const now = CONTINUE_WATCHING_MAX_AGE_MS + 100;
+  expect(getContinueWatching([entry], now)).toEqual([entry]);
+  expect(getContinueWatching([{ ...entry, dismissedFromContinueWatching: true }], now)).toEqual([]);
+  expect(getContinueWatching([entry], now + 1)).toEqual([]);
 });

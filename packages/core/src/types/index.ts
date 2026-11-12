@@ -57,6 +57,8 @@ export interface StreamSource {
   format: StreamFormat;
   headers?: Record<string, string>;
   subtitles?: SubtitleTrack[];
+  /** Credits start in seconds on this specific stream timeline. */
+  creditsStartSeconds?: number;
   requiresProxy?: boolean;
   priority?: number;
 }
