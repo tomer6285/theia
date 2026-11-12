@@ -238,7 +238,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       </div>
 
       {/* Title & Metadata */}
-      <div style={{ marginTop: 10, padding: '0 2px' }}>
+      <div style={{ marginTop: variant === 'continue' ? 6 : 10, padding: '0 2px' }}>
         <div
           style={{
             fontSize: '14px',
