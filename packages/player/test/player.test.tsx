@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   theiaStore.setState({ progress: {}, history: [] });
-  theiaStore.getState().updateSettings({ autoResume: true, autoPlayNext: true, proxyUrl: '', preferredSubtitles: ['en'] });
+  theiaStore.getState().updateSettings({ autoResume: true, autoPlayNext: true, volume: 100, muted: false, proxyUrl: '', preferredSubtitles: ['en'] });
 });
 afterEach(() => { cleanup(); setDefaultProxyUrl(''); vi.unstubAllGlobals(); });
 
@@ -395,4 +395,28 @@ describe('watcher keyboard shortcuts', () => {
     expect(fireEvent.keyDown(document.body, { key: 'ArrowLeft', altKey: true })).toBe(true);
     expect(video.currentTime).toBe(40);
   });
+});
+
+it('restores volume across titles, server changes and player remounts, including silence', () => {
+  const first = render(<VideoPlayerWeb media={media} stream={stream} />);
+  fireEvent.change(first.getByRole('slider', { name: 'Volume' }), { target: { value: '37' } });
+  expect(theiaStore.getState().settings.volume).toBe(37);
+  first.unmount();
+  const next = render(<VideoPlayerWeb media={{ ...media, id: 'episode', type: 'series' }} stream={stream} />);
+  expect(next.container.querySelector('video')!.volume).toBe(0.37);
+  next.rerender(<VideoPlayerWeb media={media} stream={{ ...stream, url: 'https://cdn.example/next.mp4' }} />);
+  expect(next.container.querySelector('video')!.volume).toBe(0.37);
+  fireEvent.click(next.getByRole('button', { name: 'Mute' }));
+  next.unmount();
+  const muted = render(<VideoPlayerWeb media={media} stream={stream} />);
+  expect(muted.container.querySelector('video')!.volume).toBe(0);
+});
+
+it('persists audio changes made through browser native controls', () => {
+  const { container } = render(<VideoPlayerWeb media={media} stream={stream} />);
+  const video = container.querySelector('video')!;
+  video.volume = 0.42;
+  video.muted = true;
+  fireEvent.volumeChange(video);
+  expect(theiaStore.getState().settings).toMatchObject({ volume: 42, muted: true });
 });

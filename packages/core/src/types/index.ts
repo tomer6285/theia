@@ -107,6 +107,8 @@ export interface UserSettings {
   proxyUrl: string;
   autoPlayNext: boolean;
   autoResume: boolean;
+  volume: number; // player volume, 0–100
+  muted: boolean;
   subtitleOffset: number; // in milliseconds
   aspectRatio: 'fit' | 'fill' | '16:9';
 }

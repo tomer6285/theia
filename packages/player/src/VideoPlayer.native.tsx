@@ -11,6 +11,10 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
   media, episode, stream, onBack, onNextEpisode, hasNextEpisode = false,
   autoPlay = true, initialTime, completionPolicy,
 }) => {
+  const [audio, setAudio] = useState(() => ({
+    volume: theiaStore.getState().settings.volume / 100,
+    muted: theiaStore.getState().settings.muted,
+  }));
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const saved = theiaStore.getState().getProgress(media.id, episode?.id);
@@ -19,7 +23,16 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
   const lastSaved = useRef(0);
   const latest = useRef<AVPlaybackStatus | null>(null);
   const save = (status: AVPlaybackStatus, force = false) => {
-    if (!status.isLoaded || !status.durationMillis) return;
+    if (!status.isLoaded) return;
+    // Native controls report audio changes through playback status, even before duration is known.
+    if (Number.isFinite(status.volume) && status.volume >= 0 && status.volume <= 1) {
+      const settings = theiaStore.getState().settings;
+      if (settings.volume !== status.volume * 100 || settings.muted !== status.isMuted) {
+        theiaStore.getState().updateSettings({ volume: status.volume * 100, muted: status.isMuted });
+        setAudio({ volume: status.volume, muted: status.isMuted });
+      }
+    }
+    if (!status.durationMillis) return;
     latest.current = status;
     if (!force && !status.didJustFinish && status.isPlaying && Date.now() - lastSaved.current < 5000) return;
     lastSaved.current = Date.now();
@@ -49,6 +62,7 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
           source={{ uri: stream.url, headers: stream.headers,
             overrideFileExtensionAndroid: stream.format === 'hls' ? 'm3u8' : undefined }}
           style={styles.video} useNativeControls resizeMode={ResizeMode.CONTAIN}
+          volume={audio.volume} isMuted={audio.muted}
           shouldPlay={autoPlay} positionMillis={Math.max(0, start.current) * 1000}
           onPlaybackStatusUpdate={status => save(status)} onError={() => setError('This stream could not be played. Try again or choose another server.')} />
       )}
