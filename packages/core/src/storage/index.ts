@@ -61,6 +61,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   proxyUrl: '',
   autoPlayNext: true,
   autoResume: true,
+  volume: 100,
+  muted: false,
   subtitleOffset: 0,
   aspectRatio: 'fit',
 };
@@ -89,7 +91,7 @@ function parseStoredState(raw: unknown): Partial<PersistedState> {
     if (!isRecord(parsed)) return {};
     const settings = { ...DEFAULT_SETTINGS };
     if (isRecord(parsed.settings)) {
-      for (const key of ['autoPlayNext', 'autoResume'] as const) {
+      for (const key of ['autoPlayNext', 'autoResume', 'muted'] as const) {
         if (typeof parsed.settings[key] === 'boolean') settings[key] = parsed.settings[key];
       }
       for (const key of ['preferredLanguages', 'preferredSubtitles', 'serverPriority'] as const) {
@@ -97,6 +99,8 @@ function parseStoredState(raw: unknown): Partial<PersistedState> {
           settings[key] = parsed.settings[key];
         }
       }
+      if (typeof parsed.settings.volume === 'number' && Number.isFinite(parsed.settings.volume)
+        && parsed.settings.volume >= 0 && parsed.settings.volume <= 100) settings.volume = parsed.settings.volume;
       if (typeof parsed.settings.proxyUrl === 'string') settings.proxyUrl = parsed.settings.proxyUrl;
       if (Number.isFinite(parsed.settings.subtitleOffset)) settings.subtitleOffset = parsed.settings.subtitleOffset;
       if (['fit', 'fill', '16:9'].includes(parsed.settings.aspectRatio)) settings.aspectRatio = parsed.settings.aspectRatio;

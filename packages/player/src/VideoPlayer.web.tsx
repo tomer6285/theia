@@ -101,8 +101,16 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   const [keyboardFocus, setKeyboardFocus] = useState(false);
   const lastMouseActivity = useRef(0);
   const [brightness, setBrightness] = useState(100);
-  const [volume, setVolume] = useState(100);
-  const previousVolume = useRef(100);
+  const [volume, setVolumeState] = useState(() => {
+    const { volume, muted } = theiaStore.getState().settings;
+    return muted ? 0 : volume;
+  });
+  const previousVolume = useRef(theiaStore.getState().settings.volume || 100);
+  const setVolume = (value: number) => {
+    setVolumeState(value);
+    theiaStore.getState().updateSettings({ volume: value, muted: false });
+    if (videoRef.current) videoRef.current.muted = false;
+  };
   const [showBrightness, setShowBrightness] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
   const [scrubOffset, setScrubOffset] = useState<number | null>(null);
@@ -216,6 +224,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
     const settings = theiaStore.getState().settings;
+    video.volume = settings.volume / 100;
+    video.muted = settings.muted;
     const saved = theiaStore.getState().getProgress(media.id, episode?.id);
     requestedTime.current = lastPosition.current?.key === mediaKey ? lastPosition.current.time
       : initialTime !== undefined ? Math.max(0, initialTime)
@@ -550,6 +560,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             aspectRatio: aspectRatio === '16:9' ? '16 / 9' : undefined,
           }}
           playsInline
+          onVolumeChange={(event) => {
+            const video = event.currentTarget;
+            const value = video.volume * 100;
+            setVolumeState(video.muted ? 0 : value);
+            const settings = theiaStore.getState().settings;
+            if (settings.volume !== value || settings.muted !== video.muted) {
+              theiaStore.getState().updateSettings({ volume: value, muted: video.muted });
+            }
+          }}
           onPlay={() => setIsPlaying(true)}
           onPause={() => { setIsPlaying(false); saveProgress(); }}
           onEnded={() => {

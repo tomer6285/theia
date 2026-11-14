@@ -147,3 +147,19 @@ it('supports native UTF-8 tokens without TextEncoder or TextDecoder globals', ()
   const token = encryptVidlinkToken('tt1/été/日本語');
   expect(decryptVidlinkToken(token)?.mediaId).toBe('tt1/été/日本語');
 });
+
+it('retains audio settings through storage hydration without expiring them', async () => {
+  const adapter = new DefaultStorageAdapter();
+  await setStorageAdapter(adapter);
+  theiaStore.getState().updateSettings({ volume: 23, muted: true });
+  await setStorageAdapter(adapter);
+  expect(theiaStore.getState().settings).toMatchObject({ volume: 23, muted: true });
+});
+
+it.each([undefined, -1, 101, '50', null])('defaults invalid or legacy stored volume %s to full volume', async volume => {
+  await setStorageAdapter({
+    getItem: () => JSON.stringify({ settings: { volume } }),
+    setItem: () => {}, removeItem: () => {},
+  });
+  expect(theiaStore.getState().settings.volume).toBe(100);
+});
