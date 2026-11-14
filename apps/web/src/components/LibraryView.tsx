@@ -2,6 +2,7 @@ import { useWatchState } from '@theia/ui';
 import React, { useState } from 'react';
 import { theiaStore, MediaItem } from '@theia/core';
 import { colors, TouchPill, MediaCard } from '@theia/ui';
+import { groupHistory, HistoryCard } from './HistoryCard';
 
 interface LibraryViewProps {
   onSelectMedia: (media: MediaItem, episodeId?: string) => void;
@@ -14,6 +15,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia, onQuick
 
   const favorites = theiaStore.getState().favorites;
   const history = theiaStore.getState().history;
+  const historyGroups = groupHistory(history);
 
   return (
     <div style={{ padding: '20px 20px 110px 20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -39,7 +41,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia, onQuick
           />
           <TouchPill
             label="History"
-            badge={history.length}
+            badge={historyGroups.length}
             active={activeTab === 'history'}
             onClick={() => setActiveTab('history')}
           />
@@ -143,29 +145,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia, onQuick
                 gap: 18,
               }}
             >
-              {history.map(({ media, progress }) => (
-                <div key={`${media.id}:${progress.episodeId || ''}`} style={{ minWidth: 0 }}>
-                  <MediaCard
-                    media={media}
-                    width="100%"
-                    onPress={() => onSelectMedia(media, progress.episodeId)}
-                    onQuickPlay={() => onSelectMedia(media, progress.episodeId)}
-                    progress={progress}
-                    isFavorite={theiaStore.getState().isFavorite(media.id)}
-                    onToggleFavorite={() => {
-                      theiaStore.getState().toggleFavorite(media);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    aria-label={`Remove ${media.title}${progress.episodeId ? ` episode ${progress.episodeId}` : ''} from History`}
-                    onClick={() => theiaStore.getState().removeHistoryEntry(media.id, progress.episodeId)}
-                    style={{ background: 'none', border: 'none', color: colors.status.danger,
-                      minHeight: 44, cursor: 'pointer', padding: '8px 0' }}
-                  >
-                    Remove from History
-                  </button>
-                </div>
+              {historyGroups.map(entries => (
+                <HistoryCard key={`${entries[0].media.type}:${entries[0].media.id}`}
+                  entries={entries} onSelectMedia={onSelectMedia} />
               ))}
             </div>
           )}
