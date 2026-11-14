@@ -296,7 +296,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 
   useEffect(() => {
     if (!isPlaying || !isHUDVisible || isSubModalOpen || isStreamSelectorOpen || keyboardFocus) return;
-    const timer = setTimeout(() => setIsHUDVisible(false), 4000);
+    const timer = setTimeout(() => setIsHUDVisible(false), 2000);
     return () => clearTimeout(timer);
   }, [isPlaying, isHUDVisible, isSubModalOpen, isStreamSelectorOpen, keyboardFocus, hudActivity, currentTime === 0]);
 
@@ -310,15 +310,14 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     });
   };
 
+  // Keep delayed single taps in sync without resetting an active gesture on render.
+  const surfaceTapRef = useRef(() => {});
+
   // Gesture Coordinator
   const coordinatorRef = useRef<GestureCoordinator | null>(null);
   useEffect(() => {
     coordinatorRef.current = new GestureCoordinator({
-      onToggleHUD: () => {
-        if (!isLocked) {
-          setIsHUDVisible((prev) => !prev);
-        }
-      },
+      onToggleHUD: () => surfaceTapRef.current(),
       onSeekDelta: (deltaSeconds) => {
         if (videoRef.current && !isLocked) {
           const target = Math.max(0, Math.min(duration, videoRef.current.currentTime + deltaSeconds));
@@ -379,6 +378,13 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     } else {
       void videoRef.current.play().catch(() => setIsPlaying(false));
     }
+  };
+
+  surfaceTapRef.current = () => {
+    if (isLocked || isSubModalOpen || isStreamSelectorOpen || !videoRef.current) return;
+    setIsHUDVisible(true);
+    setHudActivity((value) => value + 1);
+    handleTogglePlay();
   };
 
   // Capture shortcuts before focused buttons can turn Space into another click.
@@ -462,7 +468,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       }}
       onPointerDown={(e) => {
         setKeyboardFocus(false);
-        if ((e.target as HTMLElement).closest('button, input, select, [role="slider"], [role="dialog"]')) return;
+        if ((e.target as HTMLElement).closest('button, a, input, textarea, select, [role="button"], [role="slider"], [role="menu"], [role="dialog"], [contenteditable]:not([contenteditable="false"])')) return;
+        if (isSubModalOpen || isStreamSelectorOpen) return;
         if (!e.isPrimary || e.button !== 0) return;
         e.currentTarget.setPointerCapture?.(e.pointerId);
         if (isLocked) {
