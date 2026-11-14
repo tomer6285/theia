@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { theiaStore, setDefaultProxyUrl, getContinueWatching } from '@theia/core';
 import { VideoPlayerWeb } from '../src/VideoPlayer.web';
 import type { MediaItem, StreamSource } from '@theia/core';
@@ -122,6 +122,50 @@ it('respects an explicit automatic-subtitles Off preference for external tracks'
   ] }} />);
   expect(request).not.toHaveBeenCalled();
   expect(container.querySelector('track')).toBeNull();
+});
+
+describe('surface playback gestures', () => {
+  it('pauses and resumes on empty space, excluding controls and open menus', () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal('PointerEvent', MouseEvent);
+      const { container, getByRole } = render(<VideoPlayerWeb media={media} stream={stream}
+        availableStreams={[stream, { ...stream, id: 'two' }]} />);
+      const player = container.querySelector('.video-player')!;
+      const video = container.querySelector('video')!;
+      vi.spyOn(player, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, width: 1000, height: 500,
+      } as DOMRect);
+      const tap = (target: Element) => {
+        const down = new MouseEvent('pointerdown', { bubbles: true, clientX: 500, clientY: 250 });
+        Object.defineProperty(down, 'isPrimary', { value: true });
+        fireEvent(target, down);
+        fireEvent.pointerUp(target, { clientX: 500, clientY: 250 });
+        act(() => { vi.advanceTimersByTime(321); });
+      };
+      fireEvent.play(video);
+      vi.mocked(video.pause).mockClear();
+      vi.mocked(video.play).mockClear();
+      tap(video);
+      expect(video.pause).toHaveBeenCalledTimes(1);
+      expect(container.querySelector('.player-chrome')?.classList.contains('is-hidden')).toBe(false);
+      tap(container.querySelector('.player-footer')!);
+      expect(video.play).toHaveBeenCalledTimes(1);
+      fireEvent.play(video);
+      tap(getByRole('button', { name: 'Mute' }));
+      expect(video.pause).toHaveBeenCalledTimes(1);
+      fireEvent.click(getByRole('button', { name: 'Choose server' }));
+      tap(getByRole('dialog', { name: 'Playback servers' }));
+      tap(video);
+      expect(video.pause).toHaveBeenCalledTimes(1);
+      fireEvent.click(getByRole('button', { name: 'Close server selector' }));
+      fireEvent.click(getByRole('button', { name: 'Lock controls' }));
+      tap(video);
+      expect(video.pause).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('cinema controls', () => {
