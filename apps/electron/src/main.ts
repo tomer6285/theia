@@ -45,6 +45,11 @@ function createWindow() {
     },
   });
 
+  // Auto-hide still reveals the menu on Alt; remove it on Windows and Linux.
+  if (process.platform === 'win32' || process.platform === 'linux') {
+    mainWindow.setMenu(null);
+  }
+
   // Intercept and rewrite outgoing headers to bypass anti-hotlinking and CORS
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['*://*/*'] },
