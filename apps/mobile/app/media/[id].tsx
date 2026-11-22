@@ -9,11 +9,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MediaItem, cinemeta, providerManager, StreamSource, Episode } from '@theia/core';
+import { useWatchState } from '@theia/ui';
+import { theiaStore, MediaItem, cinemeta, providerManager, StreamSource, Episode } from '@theia/core';
 
 export default function MediaDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string; item?: string }>();
+  const params = useLocalSearchParams<{ id: string; item?: string; episodeId?: string }>();
+  const { favorites } = useWatchState();
   let initialItem: MediaItem = { id: params.id, title: '', type: 'movie' };
   try { if (params.item) initialItem = JSON.parse(params.item); } catch { /* use route fallback */ }
   const [media, setMedia] = useState<MediaItem>(initialItem);
@@ -59,6 +61,8 @@ export default function MediaDetailScreen() {
     }
   };
 
+  const selectedEpisode = media.episodes?.find(episode => episode.id === params.episodeId);
+  const favorite = favorites.some(item => item.id === media.id);
   const isNoStreams = hasResolved && streams.length === 0;
 
   return (
@@ -84,7 +88,7 @@ export default function MediaDetailScreen() {
               isNoStreams && { backgroundColor: '#27272a' },
             ]}
             disabled={resolving || loading || (media.type === 'series' && !media.episodes?.length)}
-            onPress={() => handlePlay()}
+            onPress={() => handlePlay(selectedEpisode)}
           >
             {pendingPlay ? (
               <ActivityIndicator color="#000" />
@@ -92,7 +96,7 @@ export default function MediaDetailScreen() {
               <Text style={[styles.playText, { color: '#71717a' }]}>No servers found — retry</Text>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.playText}>Watch Now ▶</Text>
+                <Text style={styles.playText}>{selectedEpisode ? `Play S${selectedEpisode.season} E${selectedEpisode.episode} ▶` : 'Watch Now ▶'}</Text>
                 {resolving && (
                   <View
                     style={{
@@ -105,6 +109,11 @@ export default function MediaDetailScreen() {
                 )}
               </View>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: favorite }}
+            onPress={() => theiaStore.getState().toggleFavorite(media)} style={{ paddingVertical: 12 }}>
+            <Text style={styles.epPlayIcon}>{favorite ? 'Remove from favorites' : 'Add to favorites'}</Text>
           </TouchableOpacity>
 
           {media.description && (

@@ -1,3 +1,4 @@
+import { queueTraktImport, removeTraktWatch } from "./trakt";
 import { createStore } from 'zustand/vanilla';
 import { WatchProgress, MediaItem, UserSettings } from '../types';
 
@@ -314,6 +315,7 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
   },
 
   removeHistoryEntry: (mediaId, episodeId) => {
+    removeTraktWatch(episodeId || mediaId);
     set((state) => {
       const history = state.history.filter((item) =>
         !(item.media.id === mediaId && item.progress.episodeId === episodeId)
@@ -344,3 +346,103 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
 export const dionStore = theiaStore;
 
 export * from './continueWatching';
+
+type WatchRecords = Pick<PersistedState, 'progress' | 'history' | 'favorites'>;
+
+function isBackupEpisode(value: unknown): boolean {
+  return isRecord(value) && typeof value.id === 'string' && typeof value.title === 'string'
+    && Number.isInteger(value.season) && Number.isInteger(value.episode)
+    && ['overview', 'thumbnail', 'released', 'rating'].every(key => value[key] === undefined || typeof value[key] === 'string');
+}
+
+function isBackupMedia(value: unknown): value is MediaItem {
+  if (!isRecord(value) || !isMedia(value)) return false;
+  return (['imdbId', 'tmdbId', 'year', 'poster', 'background', 'description', 'rating', 'runtime', 'status'] as const)
+    .every(key => value[key] === undefined || typeof value[key] === 'string')
+    && (['genres', 'cast', 'director', 'writer'] as const).every(key => value[key] === undefined
+      || (Array.isArray(value[key]) && value[key].every((entry: unknown) => typeof entry === 'string')))
+    && (value.episodes === undefined || (Array.isArray(value.episodes) && value.episodes.every(isBackupEpisode)))
+    && (value.seasons === undefined || (Array.isArray(value.seasons) && value.seasons.every(season =>
+      isRecord(season) && Number.isInteger(season.season) && Array.isArray(season.episodes) && season.episodes.every(isBackupEpisode))));
+}
+
+function isBackupProgress(value: unknown): value is WatchProgress {
+  return isRecord(value) && isProgress(value) && value.percentage <= 100
+    && (value.resumeByPercentage === undefined || typeof value.resumeByPercentage === 'boolean')
+    && (['season', 'episode'] as const).every(key => value[key] === undefined || Number.isInteger(value[key]));
+}
+
+export function exportWatchBackup(): string {
+  const { progress, history, favorites } = theiaStore.getState();
+  return JSON.stringify({ format: 'theia-watch-backup', version: 1, progress, history, favorites }, null, 2);
+}
+
+export function readWatchBackup(raw: string): WatchRecords {
+  const data: unknown = JSON.parse(raw);
+  if (!isRecord(data) || data.format !== 'theia-watch-backup' || data.version !== 1
+    || !isRecord(data.progress)
+    || !Object.entries(data.progress).every(([key, progress]) =>
+      isBackupProgress(progress) && key === (progress.episodeId || progress.mediaId))
+    || !Array.isArray(data.history)
+    || !data.history.every((entry: unknown) => isRecord(entry) && isBackupMedia(entry.media)
+      && isBackupProgress(entry.progress) && entry.progress.mediaId === entry.media.id
+      && Number.isFinite(entry.lastWatchedAt)
+      && (entry.dismissedFromContinueWatching === undefined || typeof entry.dismissedFromContinueWatching === 'boolean'))
+    || !Array.isArray(data.favorites) || !data.favorites.every(isBackupMedia)) {
+    throw new Error('Choose a valid Theia watch backup.');
+  }
+  const { progress, history, favorites } = data;
+  return { progress, history, favorites };
+}
+
+export function mergeWatchBackup(backup: WatchRecords): void {
+  theiaStore.setState((state) => {
+    const progress = new Map(Object.entries(state.progress));
+    for (const [key, incoming] of Object.entries(backup.progress)) {
+      if ((progress.get(key)?.updatedAt ?? -1) < incoming.updatedAt) progress.set(key, incoming);
+    }
+    const history = new Map(state.history.map((entry) => [entry.progress.episodeId || entry.media.id, entry]));
+    for (const incoming of backup.history) {
+      const key = incoming.progress.episodeId || incoming.media.id;
+      const existing = history.get(key);
+      if (!existing || incoming.lastWatchedAt > existing.lastWatchedAt) {
+        history.set(key, {
+          ...incoming,
+          dismissedFromContinueWatching: existing?.dismissedFromContinueWatching ?? incoming.dismissedFromContinueWatching,
+        });
+      }
+    }
+    const favorites = new Map([...backup.favorites, ...state.favorites].map((media) => [media.id, media]));
+    const records = {
+      progress: Object.fromEntries(progress),
+      history: [...history.values()].sort((a, b) => b.lastWatchedAt - a.lastWatchedAt),
+      favorites: [...favorites.values()],
+    };
+    saveState({ ...state, ...records });
+    return records;
+  });
+}
+
+export function describeWatchBackup(backup: WatchRecords): string {
+  return `${Object.keys(backup.progress).length} progress records, ${backup.history.length} history entries, and ${backup.favorites.length} favorites.`;
+}
+
+export const WATCH_BACKUP_FILENAME = 'theia-watch-backup.json';
+
+export function importWatchBackup(backup: WatchRecords): void {
+  const before = theiaStore.getState();
+  mergeWatchBackup(backup);
+  queueTraktImport(theiaStore.getState().history.filter((entry) => !before.history.includes(entry)
+    && entry.progress.updatedAt >= (before.progress[entry.progress.episodeId || entry.media.id]?.updatedAt ?? 0)));
+}
+
+export function removeSyncedHistory(key: string, remoteTimestamp: number): void {
+  theiaStore.setState(state => {
+    if ((state.progress[key]?.updatedAt ?? 0) > remoteTimestamp) return state;
+    const progress = { ...state.progress };
+    delete progress[key];
+    return { progress, history: state.history.filter(entry => (entry.progress.episodeId || entry.media.id) !== key) };
+  });
+}
+
+export * from './trakt';

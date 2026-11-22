@@ -1,0 +1,88 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { MediaItem, WatchProgress } from '../src/types';
+
+const movie: MediaItem = { id: 'tt12345', title: 'Example', type: 'movie' };
+const sample: WatchProgress = {
+  mediaId: movie.id, positionSeconds: 25, durationSeconds: 100, percentage: 25, completed: false, updatedAt: 1000,
+};
+
+function memoryStorage() {
+  const data = new Map<string, string>();
+  return {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => { data.set(key, value); },
+    removeItem: (key: string) => { data.delete(key); },
+  };
+}
+
+describe('watch sync', () => {
+  it('round-trips watch records, leaves settings intact, and keeps newer resume positions and dismissals', async () => {
+    vi.resetModules();
+    const { exportWatchBackup, importWatchBackup, readWatchBackup, theiaStore } = await import('../src/storage');
+    const state = theiaStore.getState();
+    state.updateSettings({ autoResume: false });
+    state.updateProgress(sample, movie);
+    state.toggleFavorite(movie);
+    const raw = exportWatchBackup();
+    expect(JSON.parse(raw)).not.toHaveProperty('settings');
+    state.updateProgress({ ...sample, positionSeconds: 12, updatedAt: 2000 }, movie);
+    state.dismissContinueWatching(movie.id);
+    expect(() => readWatchBackup(raw.replace('"version": 1', '"version": 2'))).toThrow();
+    importWatchBackup(readWatchBackup(raw));
+    expect(theiaStore.getState().getProgress(movie.id)?.positionSeconds).toBe(12);
+    expect(theiaStore.getState().history[0].dismissedFromContinueWatching).toBe(true);
+    expect(theiaStore.getState().favorites).toEqual([movie]);
+    expect(theiaStore.getState().settings.autoResume).toBe(false);
+  });
+
+  it('validates OAuth state, pulls percentage-based resume, and sends favorite changes', async () => {
+    vi.resetModules();
+    const {
+      configureTrakt, connectTrakt, disconnectTrakt, finishTraktAuthorization, syncTrakt,
+      theiaStore, traktResumePosition,
+    } = await import('../src/storage');
+    const date = new Date().toISOString();
+    const remoteMovie = { title: movie.title, ids: { imdb: movie.id, trakt: 1 } };
+    let remoteFavorite = false;
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/oauth/token') {
+        expect(url.host).toBe('auth.trakt.tv');
+        expect(JSON.parse(String(init?.body))).toMatchObject({ code_verifier: 'verifier', grant_type: 'authorization_code' });
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', expires_in: 3600 });
+      }
+      if (url.pathname === '/users/settings') return Response.json({ user: { ids: { slug: 'demo' } } });
+      if (url.pathname === '/sync/last_activities') return Response.json({ all: date });
+      if (url.pathname === '/sync/playback') return Response.json([{ id: 1, movie: remoteMovie, progress: 42, paused_at: date }]);
+      if (url.pathname === '/sync/history') return Response.json([]);
+      if (url.pathname === '/sync/favorites' && init?.method === 'POST') {
+        expect(JSON.parse(String(init.body))).toEqual({ movies: [{ ids: { imdb: movie.id } }] });
+        remoteFavorite = true;
+        return Response.json({ added: { movies: 1 } });
+      }
+      if (url.pathname === '/sync/favorites') return Response.json(remoteFavorite ? [{ movie: remoteMovie }] : []);
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    });
+    const redirectUri = 'https://example.com/settings';
+    const authorize = vi.fn(async () => undefined);
+    await configureTrakt({
+      clientId: 'client-id', redirectUri, credentials: memoryStorage(), storage: memoryStorage(), fetch, authorize,
+      makeProof: async () => ({ state: 'correct', verifier: 'verifier', challenge: 'challenge' }),
+    });
+    try {
+      await connectTrakt(false);
+      expect(authorize).toHaveBeenCalledWith(expect.stringContaining('code_challenge_method=S256'));
+      await expect(finishTraktAuthorization(redirectUri + '?code=code&state=wrong')).rejects.toThrow();
+      expect(fetch).not.toHaveBeenCalled();
+      await finishTraktAuthorization(redirectUri + '?code=code&state=correct');
+      await syncTrakt();
+      expect(traktResumePosition(theiaStore.getState().getProgress(movie.id), 1000)).toBe(420);
+      theiaStore.getState().toggleFavorite(movie);
+      await syncTrakt();
+      expect(remoteFavorite).toBe(true);
+      expect(theiaStore.getState().favorites.map(item => item.id)).toEqual([movie.id]);
+    } finally {
+      await disconnectTrakt();
+    }
+  });
+});

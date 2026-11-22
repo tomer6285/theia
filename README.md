@@ -67,6 +67,24 @@ From `apps/mobile`, `eas build -p android --profile preview` creates an APK afte
 
 Direct streams use Expo AV with native controls, saved resume positions, request headers, and automatic next-episode resolution. Embeds use WebView. Keep-awake and landscape orientation are scoped to the player screen. AsyncStorage hydrates before the app mounts.
 
+## Watch backup and Trakt sync
+
+Use **Settings → Watch backup** to export progress, history, and favorites as JSON or merge a backup from another device. Backups work offline and exclude credentials and playback settings.
+
+To enable Trakt in a build, register a Trakt API app and configure its HTTPS redirect URIs. Use the public client ID with PKCE. The integration uses these environment variables at build time.
+
+| Client | Client ID | Redirect URI |
+| --- | --- | --- |
+| Web | `VITE_TRAKT_CLIENT_ID` | `VITE_TRAKT_WEB_REDIRECT_URI` |
+| Electron | `VITE_TRAKT_CLIENT_ID` | `VITE_TRAKT_DESKTOP_REDIRECT_URI` |
+| Android | `EXPO_PUBLIC_TRAKT_CLIENT_ID` | `EXPO_PUBLIC_TRAKT_REDIRECT_URI` |
+
+- **Web** needs its production HTTPS origin registered for Trakt CORS. The redirect URI must serve the Theia app, such as its root URL. The connection lasts for the browser tab's session.
+- **Electron** intercepts its registered HTTPS callback in the Trakt sign-in window and saves the credentials using the system keyring.
+- **Android** needs an HTTPS callback ending in `/settings` on a domain you control. Serve `/.well-known/assetlinks.json` for `com.theia.app` with the installed APK signing certificate's SHA-256 fingerprint. Use a callback distinct from the Web callback and rebuild the APK after configuring the domain.
+
+Connect the same account in Settings on each device. Enable the upload checkbox if you want to merge existing local records into Trakt. Trakt stores remote resume points on pause or exit and logs a completed viewing around its 80% threshold. Automatic scrobbling is available for direct playback. Unsynced changes retry when the connection is available again.
+
 ## Playback behavior and limits
 
 Web playback supports timeline/keyboard seeking, brightness and volume gestures, a control lock, server switching, HLS audio language selection, and automatic subtitles with timing adjustments. The web player chooses full captions in your preferred language (English by default), discovers HLS/native-browser and external SRT/WebVTT tracks, and remembers explicit language/Off choices for subsequent episodes. VixSrc discovery consumes its short-lived embed token immediately and extracts a signed HLS playlist for the built-in player; it does not load a sandbox-incompatible iframe. Preferences control resume and automatic next-episode playback. Next episodes resolve fresh streams.

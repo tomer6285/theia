@@ -253,6 +253,15 @@ importers:
       expo-constants:
         specifier: ~17.0.7
         version: 17.0.8(d1053993f874140affc6dbd4bfb7a950)
+      expo-crypto:
+        specifier: ~14.0.2
+        version: 14.0.2(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0))
+      expo-document-picker:
+        specifier: ~13.0.3
+        version: 13.0.3(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0))
+      expo-file-system:
+        specifier: ~18.0.12
+        version: 18.0.12(dcb5dbba6cecad15879ecab8ea469b28)
       expo-font:
         specifier: ~13.0.4
         version: 13.0.4(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)
@@ -268,6 +277,12 @@ importers:
       expo-screen-orientation:
         specifier: ~8.0.4
         version: 8.0.4(dcb5dbba6cecad15879ecab8ea469b28)
+      expo-secure-store:
+        specifier: ~14.0.1
+        version: 14.0.1(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0))
+      expo-sharing:
+        specifier: ~13.0.1
+        version: 13.0.1(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0))
       expo-status-bar:
         specifier: ~2.0.1
         version: 2.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)
@@ -283,6 +298,9 @@ importers:
       react-native-screens:
         specifier: ~4.4.0
         version: 4.4.0(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)
+      react-native-url-polyfill:
+        specifier: ^2.0.0
+        version: 2.0.0(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))
       react-native-webview:
         specifier: 13.12.5
         version: 13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)
@@ -3115,6 +3133,16 @@ packages:
       expo: '*'
       react-native: '*'
 
+  expo-crypto@14.0.2:
+    resolution: {integrity: sha512-WRc9PBpJraJN29VD5Ef7nCecxJmZNyRKcGkNiDQC1nhY5agppzwhqh7zEzNFarE/GqDgSiaDHS8yd5EgFhP9AQ==}
+    peerDependencies:
+      expo: '*'
+
+  expo-document-picker@13.0.3:
+    resolution: {integrity: sha512-348xcsiA/YhgWm1SuJNNdb5cUDpRJYCyIk8MhOU2MEDxbVRR+Q1TiUBTCIMVqaWHcxsFQzP56Wwv9n24qjeILg==}
+    peerDependencies:
+      expo: '*'
+
   expo-file-system@18.0.12:
     resolution: {integrity: sha512-HAkrd/mb8r+G3lJ9MzmGeuW2B+BxQR1joKfeCyY4deLl1zoZ48FrAWjgZjHK9aHUVhJ0ehzInu/NQtikKytaeg==}
     peerDependencies:
@@ -3170,6 +3198,16 @@ packages:
     peerDependencies:
       expo: '*'
       react-native: '*'
+
+  expo-secure-store@14.0.1:
+    resolution: {integrity: sha512-QUS+j4+UG4jRQalgnpmTvvrFnMVLqPiUZRzYPnG3+JrZ5kwVW2w6YS3WWerPoR7C6g3y/a2htRxRSylsDs+TaQ==}
+    peerDependencies:
+      expo: '*'
+
+  expo-sharing@13.0.1:
+    resolution: {integrity: sha512-qych3Nw65wlFcnzE/gRrsdtvmdV0uF4U4qVMZBJYPG90vYyWh2QM9rp1gVu0KWOBc7N8CC2dSVYn4/BXqJy6Xw==}
+    peerDependencies:
+      expo: '*'
 
   expo-status-bar@2.0.1:
     resolution: {integrity: sha512-AkIPX7jWHRPp83UBZ1iXtVvyr0g+DgBVvIXTtlmPtmUsm8Vq9Bb5IGj86PW8osuFlgoTVAg7HI/+Ok7yEYwiRg==}
@@ -4630,6 +4668,11 @@ packages:
     resolution: {integrity: sha512-c7zc7Zwjty6/pGyuuvh9gK3YBYqHPOxrhXfG1lF4gHlojQSmIx2piNbNaV+Uykj+RDTmFXK0e/hA+fucw/Qozg==}
     peerDependencies:
       react: '*'
+      react-native: '*'
+
+  react-native-url-polyfill@2.0.0:
+    resolution: {integrity: sha512-My330Do7/DvKnEvwQc0WdcBnFPploYKp9CYlefDXzIdEaA+PAhDYllkvGeEroEzvc4Kzzj2O4yVdz8v6fjRvhA==}
+    peerDependencies:
       react-native: '*'
 
   react-native-webview@13.12.5:
@@ -10490,6 +10533,15 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  expo-crypto@14.0.2(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)):
+    dependencies:
+      base64-js: 1.5.1
+      expo: 52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)
+
+  expo-document-picker@13.0.3(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)):
+    dependencies:
+      expo: 52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)
+
   expo-file-system@18.0.12(d853e15bb58d489b0df242748697e403):
     dependencies:
       expo: 52.0.49(@babel/core@7.29.7(supports-color@8.1.1))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@8.1.1))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@8.1.1)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@8.1.1))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@8.1.1))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@8.1.1))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@8.1.1))(react@18.3.1)(supports-color@8.1.1)
@@ -10586,6 +10638,14 @@ snapshots:
     dependencies:
       expo: 52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)
       react-native: 0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)
+
+  expo-secure-store@14.0.1(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)):
+    dependencies:
+      expo: 52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)
+
+  expo-sharing@13.0.1(expo@52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)):
+    dependencies:
+      expo: 52.0.49(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@expo/metro-runtime@4.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)))(encoding@0.1.14)(react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1))(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1)(supports-color@7.2.0)
 
   expo-status-bar@2.0.1(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1):
     dependencies:
@@ -12432,6 +12492,11 @@ snapshots:
       react-freeze: 1.0.4(react@18.3.1)
       react-native: 0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)
       warn-once: 0.1.1
+
+  react-native-url-polyfill@2.0.0(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)):
+    dependencies:
+      react-native: 0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0)
+      whatwg-url-without-unicode: 8.0.0-3
 
   react-native-webview@13.12.5(react-native@0.76.7(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.3.31)(encoding@0.1.14)(react@18.3.1)(supports-color@7.2.0))(react@18.3.1):
     dependencies:
