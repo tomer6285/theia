@@ -1,3 +1,4 @@
+import { installTraktHandlers } from './trakt';
 import { pathToFileURL } from 'url';
 import { app, BrowserWindow, dialog, session } from 'electron';
 import * as path from 'path';
@@ -108,6 +109,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   desktopProxy = await startDesktopProxy();
+  installTraktHandlers(() => mainWindow, () => pathToFileURL(resolveWebIndexPath()).href);
   createWindow();
 
   app.on('activate', () => {

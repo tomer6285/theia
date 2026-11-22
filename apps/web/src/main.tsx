@@ -1,4 +1,5 @@
-import { setDefaultProxyUrl } from '@theia/core';
+import { initializeTrakt } from './trakt';
+import { reportTraktError, setDefaultProxyUrl } from '@theia/core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
@@ -19,6 +20,8 @@ document.addEventListener('keydown', (event) => {
   }
 }, { capture: true, signal: inputListeners.signal });
 if (import.meta.hot) import.meta.hot.dispose(() => inputListeners.abort());
+
+void initializeTrakt().catch(reportTraktError);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

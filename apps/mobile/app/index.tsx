@@ -10,11 +10,13 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { useWatchState } from '@theia/ui';
 import { useRouter } from 'expo-router';
-import { MediaItem, cinemeta, theiaStore } from '@theia/core';
+import { MediaItem, cinemeta } from '@theia/core';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { history, favorites } = useWatchState();
   const [query, setQuery] = useState('');
   const [popularMovies, setPopularMovies] = useState<MediaItem[]>([]);
   const [popularSeries, setPopularSeries] = useState<MediaItem[]>([]);
@@ -56,10 +58,10 @@ export default function HomeScreen() {
     return () => { active = false; clearTimeout(timer); };
   }, [query]);
 
-  const handleSelectMedia = (item: MediaItem) => {
+  const handleSelectMedia = (item: MediaItem, episodeId?: string) => {
     router.push({
       pathname: '/media/[id]',
-      params: { id: item.id, item: JSON.stringify(item) },
+      params: { id: item.id, item: JSON.stringify(item), episodeId },
     });
   };
 
@@ -73,6 +75,7 @@ export default function HomeScreen() {
         <Text style={styles.headerTitle}>
           The<Text style={{ color: '#06b6d4' }}>ia</Text>
         </Text>
+        <TouchableOpacity style={{ marginLeft: "auto" }} onPress={() => router.push("/settings")} accessibilityRole="button"><Text style={{ color: "#67e8f9" }}>Settings</Text></TouchableOpacity>
       </View>
 
       {/* Search Input */}
@@ -127,6 +130,32 @@ export default function HomeScreen() {
         {/* Discovery Sections */}
         {!query.trim() && (
           <>
+            {history.length > 0 && <>
+              <Text style={styles.sectionTitle}>Watch history</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>
+                {history.slice(0, 20).map(({ media, progress }) => (
+                  <TouchableOpacity key={progress.episodeId || media.id} accessibilityRole="button"
+                    style={styles.carouselCard} onPress={() => handleSelectMedia(media, progress.episodeId)}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{media.title}</Text>
+                    <Text style={styles.cardTitle}>
+                      {progress.episodeId ? `S${progress.season} E${progress.episode} · ` : ''}
+                      {progress.completed ? 'Watched' : `${Math.round(progress.percentage)}%`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>}
+            {favorites.length > 0 && <>
+              <Text style={styles.sectionTitle}>Favorites</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>
+                {favorites.map(item => (
+                  <TouchableOpacity key={item.id} accessibilityRole="button"
+                    style={styles.carouselCard} onPress={() => handleSelectMedia(item)}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>}
             {/* Trending Movies */}
             <Text style={styles.sectionTitle}>🔥 Trending Movies</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>

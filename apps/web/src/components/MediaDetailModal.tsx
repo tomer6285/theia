@@ -125,7 +125,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
             setIsPendingPlay(false);
             if (best) {
               const saved = theiaStore.getState().getProgress(media.id, selectedEpisode?.id);
-              onPlay(media, best, resolved, selectedEpisode, resumeImmediately && saved && !saved.completed ? saved.positionSeconds : undefined);
+              onPlay(media, best, resolved, selectedEpisode, resumeImmediately && saved && !saved.completed ? saved.positionSeconds || undefined : undefined);
               onClose();
             }
           }
@@ -153,7 +153,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
   const handleStartPlayback = (startOver = false) => {
     if (selectedStream) {
-      onPlay(media, selectedStream, streams, selectedEpisode, startOver ? 0 : progress && !progress.completed ? progress.positionSeconds : undefined);
+      onPlay(media, selectedStream, streams, selectedEpisode, startOver ? 0 : progress && !progress.completed ? progress.positionSeconds || undefined : undefined);
       onClose();
     } else if (isResolvingStreams) {
       pendingPlayRef.current = true;
@@ -253,7 +253,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {progress && !progress.completed && progress.positionSeconds > 0 && selectedStream && (
+        {progress && !progress.completed && (progress.positionSeconds > 0 || progress.resumeByPercentage) && selectedStream && (
           <button type="button" onClick={() => handleStartPlayback(true)} style={{ margin: 16 }}>Start over</button>
         )}
         {/* Swipe Handle Indicator */}

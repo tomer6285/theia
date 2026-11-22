@@ -1,9 +1,10 @@
+import { createScrobbleSession } from './scrobble';
 import { isPlaybackCompleted } from './completion';
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, View, Text, Pressable, StyleSheet } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { WebView } from 'react-native-webview';
-import { theiaStore } from '@theia/core';
+import { refreshTraktResume, theiaStore, traktResumePosition, traktStatus } from '@theia/core';
 import { VideoPlayerProps } from './types';
 
 /** Native playback uses Expo's video engine; provider embeds use an isolated WebView. */
@@ -20,6 +21,11 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
   const saved = theiaStore.getState().getProgress(media.id, episode?.id);
   const start = useRef(initialTime ?? (theiaStore.getState().settings.autoResume && saved && !saved.completed
     ? saved.positionSeconds : 0));
+  const video = useRef<Video>(null);
+  const [resumeReady, setResumeReady] = useState(stream.format === 'embed' || (!saved?.resumeByPercentage && !traktStatus.getState().connected));
+  const preparing = useRef(false);
+  const mounted = useRef(true);
+  const scrobble = React.useMemo(() => createScrobbleSession(media, episode), [media.id, episode?.id]);
   const lastSaved = useRef(0);
   const latest = useRef<AVPlaybackStatus | null>(null);
   const save = (status: AVPlaybackStatus, force = false) => {
@@ -33,7 +39,32 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
       }
     }
     if (!status.durationMillis) return;
+    if (!resumeReady) {
+      if (!preparing.current) {
+        preparing.current = true;
+        const instance = video.current;
+        void (async () => {
+          if (initialTime === undefined && theiaStore.getState().settings.autoResume) {
+            await refreshTraktResume();
+            if (!mounted.current || !instance || instance !== video.current) return;
+            const progress = theiaStore.getState().getProgress(media.id, episode?.id);
+            const position = traktResumePosition(progress, status.durationMillis! / 1000);
+            start.current = Math.min(position, Math.max(0, status.durationMillis! / 1000 - 0.001));
+            await instance.setPositionAsync(start.current * 1000);
+          }
+        })().catch(() => {}).finally(() => { if (mounted.current) setResumeReady(true); });
+      }
+      return;
+    }
     latest.current = status;
+    const position = status.positionMillis / 1000;
+    const duration = status.durationMillis / 1000;
+    if (force) scrobble('stop', position, duration);
+    else if (status.didJustFinish) scrobble('end', position, duration);
+    else if (status.isPlaying) {
+      scrobble('playing', position, duration);
+      scrobble('progress', position, duration);
+    } else if (!status.isBuffering) scrobble('pause', position, duration);
     if (!force && !status.didJustFinish && status.isPlaying && Date.now() - lastSaved.current < 5000) return;
     lastSaved.current = Date.now();
     const percentage = status.positionMillis / status.durationMillis * 100;
@@ -45,9 +76,10 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
     if (!force && status.didJustFinish && hasNextEpisode && theiaStore.getState().settings.autoPlayNext) onNextEpisode?.();
   };
   useEffect(() => {
+    mounted.current = true;
     const flush = () => { if (latest.current) save(latest.current, true); };
     const subscription = AppState.addEventListener('change', state => { if (state !== 'active') flush(); });
-    return () => { flush(); latest.current = null; subscription.remove(); };
+    return () => { mounted.current = false; flush(); latest.current = null; subscription.remove(); };
   }, [media, episode, stream, completionPolicy]);
   return (
     <View style={styles.container}>
@@ -58,12 +90,12 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
           setSupportMultipleWindows onError={() => setError('This server could not be loaded.')}
           onShouldStartLoadWithRequest={(request) => /^https?:\/\//.test(request.url)} />
       ) : (
-        <Video key={`${episode?.id || media.id}-${stream.url}-${attempt}`}
+        <Video ref={resumeReady ? undefined : video} key={`${episode?.id || media.id}-${stream.url}-${attempt}`}
           source={{ uri: stream.url, headers: stream.headers,
             overrideFileExtensionAndroid: stream.format === 'hls' ? 'm3u8' : undefined }}
           style={styles.video} useNativeControls resizeMode={ResizeMode.CONTAIN}
           volume={audio.volume} isMuted={audio.muted}
-          shouldPlay={autoPlay} positionMillis={Math.max(0, start.current) * 1000}
+          shouldPlay={autoPlay && resumeReady} positionMillis={Math.max(0, start.current) * 1000}
           onPlaybackStatusUpdate={status => save(status)} onError={() => setError('This stream could not be played. Try again or choose another server.')} />
       )}
       {onBack && <Pressable accessibilityRole="button" accessibilityLabel="Back to details"

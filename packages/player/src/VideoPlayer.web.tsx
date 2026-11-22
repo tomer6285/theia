@@ -1,10 +1,11 @@
+import { createScrobbleSession } from './scrobble';
 import { isPlaybackCompleted } from './completion';
 import { readEmbedProgress, supportsEmbedProgress } from './embedProgress';
 import { useVideoSubtitles } from './useVideoSubtitles';
 import { preferredTrackIndex } from './languages';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
-import { theiaStore, proxyResourceUrl } from '@theia/core';
+import { theiaStore, proxyResourceUrl, refreshTraktResume, traktResumePosition, traktStatus } from '@theia/core';
 import { colors, TouchSlider, SubtitleStepper } from '@theia/ui';
 import { VideoPlayerProps, AspectRatioMode } from './types';
 import { playerStyles, PlayerIcon } from './playerChrome';
@@ -138,6 +139,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const mediaKey = episode?.id || media.id;
+  const scrobble = React.useMemo(() => createScrobbleSession(media, episode), [mediaKey]);
+  const resumeRequest = useRef(0);
   const lastPosition = useRef<{ key: string; time: number } | null>(null);
   const requestedTime = useRef(0);
 
@@ -280,7 +283,9 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     } else fail();
 
     return () => {
+      resumeRequest.current++;
       saveVideoProgress(video);
+      scrobble('stop', video.currentTime, video.duration);
       lastPosition.current = { key: mediaKey, time: video.currentTime };
       hls?.destroy();
       hlsRef.current = null;
@@ -291,15 +296,20 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
 
   useEffect(() => {
     const interval = setInterval(saveProgress, 5000);
+    const onPageHide = () => {
+      saveProgress();
+      const video = videoRef.current;
+      if (video) scrobble('stop', video.currentTime, video.duration);
+    };
     const onVisibility = () => { if (document.hidden) saveProgress(); };
-    window.addEventListener('pagehide', saveProgress);
+    window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('pagehide', saveProgress);
+      window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [saveProgress]);
+  }, [saveProgress, scrobble]);
 
   const subtitles = useVideoSubtitles({ videoRef, hlsRef, stream,
     sessionKey: `${mediaKey}:${stream.id}:${stream.url}:${retryCount}`, offsetMs: subtitleOffsetMs });
@@ -369,7 +379,9 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   // Video event handlers
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
-    const curr = videoRef.current.currentTime;
+    const video = videoRef.current;
+    const curr = video.currentTime;
+    if (!video.paused && !video.seeking) scrobble('progress', curr, video.duration);
     setCurrentTime(curr);
 
     // Trigger next episode banner if 30s or less remain
@@ -570,9 +582,14 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             }
           }}
           onPlay={() => setIsPlaying(true)}
-          onPause={() => { setIsPlaying(false); saveProgress(); }}
-          onEnded={() => {
+          onPause={({ currentTarget: video }) => {
+            setIsPlaying(false);
             saveProgress();
+            scrobble('pause', video.currentTime, video.duration);
+          }}
+          onEnded={({ currentTarget: video }) => {
+            saveProgress();
+            scrobble('end', video.currentTime, video.duration);
             if (hasNextEpisode && theiaStore.getState().settings.autoPlayNext) onNextEpisode?.();
           }}
           onError={() => {
@@ -580,19 +597,32 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             setPlaybackError('This stream could not be played. Retry or choose another server.');
           }}
           onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={() => {
-            if (videoRef.current) {
-              const video = videoRef.current;
-              setDuration(Number.isFinite(video.duration) ? video.duration : 0);
-              if (requestedTime.current > 0 && Number.isFinite(video.duration)) {
-                video.currentTime = Math.min(requestedTime.current, Math.max(0, video.duration - 1));
+          onLoadedMetadata={async ({ currentTarget: video }) => {
+            const request = ++resumeRequest.current;
+            const fromBeginning = initialTime === 0 || lastPosition.current?.key === mediaKey;
+            const canResume = !fromBeginning && (initialTime !== undefined || theiaStore.getState().settings.autoResume);
+            if (canResume) {
+              const connected = traktStatus.getState().connected;
+              if (connected) {
+                await refreshTraktResume();
+                if (request !== resumeRequest.current || videoRef.current !== video) return;
               }
-              if (autoPlay) void video.play().catch(() => { setIsPlaying(false); setIsBuffering(false); });
+              const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+              if (connected || saved?.resumeByPercentage) requestedTime.current = traktResumePosition(saved, video.duration);
             }
+            setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+            if (requestedTime.current > 0 && Number.isFinite(video.duration)) {
+              video.currentTime = Math.min(requestedTime.current, Math.max(0, video.duration - 1));
+            }
+            if (autoPlay) void video.play().catch(() => { setIsPlaying(false); setIsBuffering(false); });
           }}
           onCanPlay={() => setIsBuffering(false)}
           onWaiting={() => setIsBuffering(true)}
-          onPlaying={() => { setIsBuffering(false); setPlaybackError(null); }}
+          onPlaying={({ currentTarget: video }) => {
+            setIsBuffering(false);
+            setPlaybackError(null);
+            if (!video.seeking) scrobble('playing', video.currentTime, video.duration);
+          }}
         >
           {subtitles.url && <track key={subtitles.url} kind="subtitles" src={subtitles.url}
             data-theia-subtitles={subtitles.selectedId}

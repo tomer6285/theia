@@ -89,6 +89,7 @@ export interface WatchProgress {
   durationSeconds: number;
   percentage: number;
   completed: boolean;
+  resumeByPercentage?: boolean;
   updatedAt: number;
 }
 

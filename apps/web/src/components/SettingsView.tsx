@@ -1,3 +1,5 @@
+import { TraktSettings } from './TraktSettings';
+import { WatchBackupSettings } from './WatchBackupSettings';
 import { useWatchState } from '@theia/ui';
 import React, { useState, useRef, useEffect } from 'react';
 import { theiaStore, getDefaultProxyUrl } from '@theia/core';
@@ -44,6 +46,9 @@ export const SettingsView: React.FC = () => {
           Configure stream routing, proxy endpoints, and touch playback
         </p>
       </div>
+
+      <WatchBackupSettings />
+      <TraktSettings />
 
       {/* Cloudflare Edge Proxy Config */}
       <div
