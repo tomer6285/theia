@@ -63,7 +63,7 @@ pnpm --filter @theia/mobile start
 pnpm --filter @theia/mobile exec expo export --platform android --output-dir dist --no-bytecode --max-workers 2
 ```
 
-From `apps/mobile`, `eas build -p android --profile preview` creates an APK after EAS setup. The native entry points resolve shared source, so Metro does not require prebuilt shared `dist` folders.
+Run `./release.sh --android-only` from the repo root to build a signed APK in Expo EAS. Sign in first with `npx eas-cli@latest login`. The first build prompts you to link or create an EAS project and configure Android signing. Download the APK from the build link printed by EAS. The native entry points resolve shared source, so Metro does not require prebuilt shared `dist` folders.
 
 Direct streams use Expo AV with native controls, saved resume positions, request headers, and automatic next-episode resolution. Embeds use WebView. Keep-awake and landscape orientation are scoped to the player screen. AsyncStorage hydrates before the app mounts.
 

@@ -2,7 +2,7 @@
 
 # ==============================================================================
 # Theia — Multi-Platform & Multi-Architecture Release Script
-# Builds Electron desktop releases for:
+# Builds Android APKs with EAS and Electron desktop releases for:
 #   - Linux:   AMD64 (x86_64) & ARM64 (aarch64) [AppImage, Debian (.deb), Fedora (.rpm)]
 #   - Windows: AMD64 (x64)    & ARM64 (arm64)
 #   - macOS:   AMD64 (x64)    & ARM64 (Apple Silicon)
@@ -50,6 +50,7 @@ for arg in "$@"; do
     --linux-only) TARGET_OS=linux; RPM_ONLY=false ;;
     --win-only) TARGET_OS=win; RPM_ONLY=false ;;
     --mac-only) TARGET_OS=mac; RPM_ONLY=false ;;
+    --android-only) TARGET_OS=android; RPM_ONLY=false ;;
     --rpm-only|--rpm) TARGET_OS=linux; RPM_ONLY=true ;;
     --skip-rpm|--no-rpm) BUILD_RPM=false ;;
     --x64|--amd64) ARCH_SELECTION=x64 ;;
@@ -65,12 +66,13 @@ Defaults to the current OS and CPU architecture.
   --linux-only   Build Linux AppImage, deb, and rpm (when rpmbuild is available)
   --win-only     Build Windows installers
   --mac-only     Build macOS DMGs (requires a macOS host)
+  --android-only Build a signed Android APK with Expo EAS
   --rpm-only     Build only Linux RPM packages (requires rpmbuild)
   --skip-rpm     Skip RPM packages
   --x64          Build for x64 (alias: --amd64)
   --arm64        Build for ARM64
-  --all-arch     Build both x64 and ARM64 for the selected OS
-  --dir          Produce unpacked directories instead of installers
+  --all-arch     Build both x64 and ARM64 for the selected desktop OS
+  --dir          Produce unpacked desktop directories instead of installers
   --skip-tests   Skip core unit tests
   -h, --help     Show this help
 
@@ -82,9 +84,24 @@ HELP
   esac
 done
 
+run_tests() {
+  if [ "$SKIP_TESTS" = false ]; then
+    echo -e "${YELLOW}==> Running unit tests in @theia/core...${NC}"
+    pnpm exec vitest run packages/core/test
+  else
+    echo -e "${YELLOW}==> Skipping unit tests (--skip-tests specified)${NC}"
+  fi
+}
+
+if [ "$TARGET_OS" = android ]; then
+  run_tests
+  echo -e "${YELLOW}==> Building the Android APK with Expo EAS...${NC}"
+  exec pnpm --dir apps/mobile run build:android
+fi
+
 case "$TARGET_OS" in
   linux|win|mac) ;;
-  *) echo "ERROR: Unsupported host OS. Select --linux-only, --win-only, or --mac-only." >&2; exit 1 ;;
+  *) echo "ERROR: Unsupported host OS. Select --linux-only, --win-only, --mac-only, or --android-only." >&2; exit 1 ;;
 esac
 case "$ARCH_SELECTION" in
   x64|arm64) ARCHES=("$ARCH_SELECTION") ;;
@@ -123,12 +140,7 @@ if [ "$RPM_ONLY" = true ] && [ "$HAS_RPMBUILD" = false ]; then
 fi
 
 # 1. Verification & Tests
-if [ "$SKIP_TESTS" = false ]; then
-  echo -e "${YELLOW}==> Running unit tests in @theia/core...${NC}"
-  pnpm exec vitest run packages/core/test
-else
-  echo -e "${YELLOW}==> Skipping unit tests (--skip-tests specified)${NC}"
-fi
+run_tests
 
 # 2. Compile Web Frontend & Monorepo Packages
 echo -e "\n${YELLOW}==> Building web frontend and dependent packages with Turborepo...${NC}"
