@@ -1,0 +1,109 @@
+.card {
+  padding: 22px;
+  border: 1.5px solid;
+  border-radius: 20px;
+}
+
+.card h3 {
+  margin-bottom: 4px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.row + .row {
+  border-top: 1px solid #27272a;
+  padding-bottom: 0;
+}
+
+.row h4 {
+  margin-bottom: 3px;
+  color: #f4f4f5;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.card p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 90px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #3f3f46;
+  border-radius: 10px;
+  background: #1c1c22;
+  color: #f4f4f5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: #27272a;
+}
+
+.action.accent {
+  border-color: #275562;
+  background: #122b34;
+  color: #48d1ea;
+}
+
+.action.accent:hover {
+  background: #173944;
+}
+
+.action[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.action svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.confirmation {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.message {
+  margin-top: 12px;
+}
+
+@media (max-width: 400px) {
+  .card {
+    padding: 16px;
+  }
+}

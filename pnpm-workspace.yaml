@@ -25,4 +25,5 @@ packageExtensions:
       use-latest-callback: '^0.2.1'
 
 patchedDependencies:
+  '@expo/cli@0.22.28': patches/@expo__cli@0.22.28.patch
   query-string@7.1.3: patches/query-string@7.1.3.patch
