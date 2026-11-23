@@ -130,6 +130,22 @@ input:focus-visible, textarea:focus-visible { outline-offset: 2px; }
 .loading-state, .player-loading { min-height: 220px; display: flex; align-items: center; justify-content: center; gap: 14px; color: #a1a1aa; }
 .loading-spinner { width: 24px; height: 24px; border: 2px solid #27272a; border-top-color: #22d3ee; border-radius: 50%; animation: spin .8s linear infinite; }
 .media-detail { max-width: 900px; align-self: center; }
+.media-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.media-detail-play { flex: 1; }
+.media-detail-start-over { padding-inline: 14px; white-space: nowrap; }
+.media-detail-episodes { padding-inline: 20px; }
+@media (max-width: 440px) {
+  .media-detail-actions.has-start-over { gap: 8px; }
+  .has-start-over .media-detail-play { flex-basis: 100%; }
+  .has-start-over .media-detail-start-over { flex: 1; }
+  .has-start-over .media-detail-start-over,
+  .has-start-over .media-detail-episodes { padding-inline: 12px; }
+}
 .episode-sheet { width: 100%; max-width: 1000px; align-self: center; }
 .episode-status { position: absolute; inset: 0; z-index: 1100; background: #09090bed; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; text-align: center; }
 .video-player { outline-offset: -4px; }

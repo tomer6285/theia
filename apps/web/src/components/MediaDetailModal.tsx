@@ -10,6 +10,22 @@ import {
 } from '@theia/core';
 import { colors, TouchPill, EpisodeSheet, useModal } from '@theia/ui';
 
+const secondaryActionStyle: React.CSSProperties = {
+  height: 44,
+  borderRadius: 8,
+  backgroundColor: colors.bg.elevated,
+  border: `1px solid ${colors.border.subtle}`,
+  color: '#fff',
+  fontSize: '15px',
+  fontWeight: 700,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  touchAction: 'manipulation',
+};
+
 interface MediaDetailModalProps {
   media: MediaItem;
   isOpen: boolean;
@@ -50,6 +66,9 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
   // Sync state
   const isFav = theiaStore.getState().isFavorite(media.id);
   const progress = theiaStore.getState().getProgress(media.id, selectedEpisode?.id);
+  const canStartOver = Boolean(
+    progress && !progress.completed && (progress.positionSeconds > 0 || progress.resumeByPercentage) && selectedStream,
+  );
 
   // Fetch full details if episodes/cast/tmdbId are missing
   useEffect(() => {
@@ -253,9 +272,6 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {progress && !progress.completed && (progress.positionSeconds > 0 || progress.resumeByPercentage) && selectedStream && (
-          <button type="button" onClick={() => handleStartPlayback(true)} style={{ margin: 16 }}>Start over</button>
-        )}
         {/* Swipe Handle Indicator */}
         <div
           onPointerDown={handlePointerDownDrag}
@@ -388,14 +404,13 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
 
         {/* Content Body */}
         <div style={{ padding: '20px 24px 36px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Main Thumb Action Bar: Play CTA & Episodes & Favorite */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <div className={canStartOver ? 'media-detail-actions has-start-over' : 'media-detail-actions'}>
             <button
               type="button"
+              className="media-detail-play"
               disabled={isNoStreamsAvailable || (media.type === 'series' && !selectedEpisode)}
               onClick={() => handleStartPlayback()}
               style={{
-                flex: 1,
                 height: 44,
                 borderRadius: 8,
                 backgroundColor: isNoStreamsAvailable ? colors.bg.elevated : colors.text.primary,
@@ -455,26 +470,25 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               )}
             </button>
 
+            {canStartOver && (
+              <button
+                type="button"
+                className="media-detail-start-over"
+                onClick={() => handleStartPlayback(true)}
+                style={secondaryActionStyle}
+              >
+                <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>↺</span>
+                Start over
+              </button>
+            )}
+
             {/* Series Episodes Button */}
             {media.type === 'series' && (
               <button
                 type="button"
+                className="media-detail-episodes"
                 onClick={() => setIsEpisodeSheetOpen(true)}
-                style={{
-                  height: 44,
-                  padding: '0 20px',
-                  borderRadius: 8,
-                  backgroundColor: colors.bg.elevated,
-                  border: `1px solid ${colors.border.subtle}`,
-                  color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  touchAction: 'manipulation',
-                }}
+                style={secondaryActionStyle}
               >
                 <span>Episodes</span>
               </button>
