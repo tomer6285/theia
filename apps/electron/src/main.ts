@@ -6,6 +6,12 @@ import * as fs from 'fs';
 import { startDesktopProxy } from './proxy';
 import { allowPlayerPermission } from './permissions';
 
+// Chromium does not automatically select Secret Service on Hyprland.
+if (process.platform === 'linux' && !app.commandLine.hasSwitch('password-store')
+  && process.env.XDG_CURRENT_DESKTOP?.toLowerCase().split(':').includes('hyprland')) {
+  app.commandLine.appendSwitch('password-store', 'gnome-libsecret');
+}
+
 let mainWindow: BrowserWindow | null = null;
 let desktopProxy: Awaited<ReturnType<typeof startDesktopProxy>>;
 
