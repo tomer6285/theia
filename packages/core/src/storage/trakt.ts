@@ -10,6 +10,7 @@ type OAuthAttempt = { state: string; verifier: string; upload: boolean; startedA
 export interface TraktPlatform {
   clientId: string;
   redirectUri: string;
+  allowLocalhostRedirect?: boolean;
   credentials: StorageAdapter;
   storage: StorageAdapter;
   fetch?: typeof fetch;
@@ -198,7 +199,8 @@ async function restore(config: TraktPlatform, tokens: Tokens, account: string, u
 export async function configureTrakt(config: TraktPlatform) {
   if (!config.clientId) return;
   const callback = new URL(config.redirectUri);
-  if (callback.protocol !== 'https:' || callback.username || callback.password || callback.hash || callback.search) return;
+  const localhostRedirect = config.allowLocalhostRedirect && config.redirectUri === 'http://localhost:3000/';
+  if ((!localhostRedirect && callback.protocol !== 'https:') || callback.username || callback.password || callback.hash || callback.search) return;
   if (platform) return;
   platform = config;
   subscribeTraktFavorites();

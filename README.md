@@ -71,7 +71,7 @@ Direct streams use Expo AV with native controls, saved resume positions, request
 
 Use **Settings → Watch backup** to export progress, history, and favorites as JSON or merge a backup from another device. Backups work offline and exclude credentials and playback settings.
 
-To enable Trakt in a build, register a Trakt API app and configure its HTTPS redirect URIs. Use the public client ID with PKCE. The integration uses these environment variables at build time.
+To enable Trakt in a build, register a Trakt API app and configure its redirect URIs. Use the public client ID with PKCE. The integration uses these environment variables at build time.
 
 | Client | Client ID | Redirect URI |
 | --- | --- | --- |
@@ -80,6 +80,7 @@ To enable Trakt in a build, register a Trakt API app and configure its HTTPS red
 | Android | `EXPO_PUBLIC_TRAKT_CLIENT_ID` | `EXPO_PUBLIC_TRAKT_REDIRECT_URI` |
 
 - **Web** needs its production HTTPS origin registered for Trakt CORS. The redirect URI must serve the Theia app, such as its root URL. The connection lasts for the browser tab's session.
+- **Local web** defaults to Theia's Trakt Development client ID and the `http://localhost:3000/` callback when opened at `http://localhost:3000`. To use your own Trakt Development app, override `VITE_TRAKT_CLIENT_ID` and register `http://localhost:3000/` as the redirect URI and `http://localhost:3000` as the allowed origin. Every other callback requires HTTPS.
 - **Electron** intercepts its registered HTTPS callback in the Trakt sign-in window and saves the credentials using the system keyring.
 - **Android** needs an HTTPS callback ending in `/settings` on a domain you control. Serve `/.well-known/assetlinks.json` for `com.theia.app` with the installed APK signing certificate's SHA-256 fingerprint. Use a callback distinct from the Web callback and rebuild the APK after configuring the domain.
 

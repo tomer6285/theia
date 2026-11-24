@@ -35,7 +35,32 @@ describe('watch sync', () => {
     expect(theiaStore.getState().settings.autoResume).toBe(false);
   });
 
-  it('validates OAuth state, pulls percentage-based resume, and sends favorite changes', async () => {
+  it.each([
+    ['http://localhost:3000/', true, true],
+    ['http://localhost:3000/', false, false],
+    ['http://localhost:3000', true, false],
+    ['http://localhost:3001/', true, false],
+    ['http://localhost:3000/settings', true, false],
+    ['http://localhost:3000/?code=test', true, false],
+    ['http://127.0.0.1:3000/', true, false],
+    ['http://localhost.example.com:3000/', true, false],
+    ['https://example.com/', false, true],
+  ])('checks Trakt redirect %s with localhost opt-in %s', async (redirectUri, allowLocalhostRedirect, available) => {
+    vi.resetModules();
+    const { configureTrakt, traktStatus } = await import('../src/storage');
+    await configureTrakt({
+      clientId: 'client-id', redirectUri, allowLocalhostRedirect,
+      credentials: memoryStorage(), storage: memoryStorage(),
+      authorize: async () => undefined,
+      makeProof: async () => ({ state: 'correct', verifier: 'verifier', challenge: 'challenge' }),
+    });
+    expect(traktStatus.getState().available).toBe(available);
+  });
+
+  it.each([
+    'https://example.com/settings',
+    'http://localhost:3000/',
+  ])('validates OAuth state, pulls resume progress, and sends favorite changes via %s', async (redirectUri) => {
     vi.resetModules();
     const {
       configureTrakt, connectTrakt, disconnectTrakt, finishTraktAuthorization, syncTrakt,
@@ -63,10 +88,10 @@ describe('watch sync', () => {
       if (url.pathname === '/sync/favorites') return Response.json(remoteFavorite ? [{ movie: remoteMovie }] : []);
       throw new Error(`Unexpected request: ${url.pathname}`);
     });
-    const redirectUri = 'https://example.com/settings';
     const authorize = vi.fn(async () => undefined);
     await configureTrakt({
       clientId: 'client-id', redirectUri, credentials: memoryStorage(), storage: memoryStorage(), fetch, authorize,
+      allowLocalhostRedirect: redirectUri === 'http://localhost:3000/',
       makeProof: async () => ({ state: 'correct', verifier: 'verifier', challenge: 'challenge' }),
     });
     try {
