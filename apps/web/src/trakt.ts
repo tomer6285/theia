@@ -10,11 +10,14 @@ const bytesToBase64Url = (bytes: Uint8Array) =>
 
 export async function initializeTrakt() {
   const desktop = window.theiaElectron?.trakt;
-  const localWeb = !desktop && location.origin === LOCAL_TRAKT_ORIGIN;
-  const clientId = import.meta.env.VITE_TRAKT_CLIENT_ID?.trim() || (localWeb ? LOCAL_TRAKT_CLIENT_ID : '');
-  const redirectUri = desktop
+  const allowLocalhostRedirect = Boolean(desktop) || location.origin === LOCAL_TRAKT_ORIGIN;
+  const localhostRedirect = LOCAL_TRAKT_ORIGIN + '/';
+  const configuredRedirect = desktop
     ? import.meta.env.VITE_TRAKT_DESKTOP_REDIRECT_URI
-    : import.meta.env.VITE_TRAKT_WEB_REDIRECT_URI || (localWeb ? LOCAL_TRAKT_ORIGIN + '/' : '');
+    : import.meta.env.VITE_TRAKT_WEB_REDIRECT_URI;
+  const redirectUri = configuredRedirect || (allowLocalhostRedirect ? localhostRedirect : '');
+  const clientId = import.meta.env.VITE_TRAKT_CLIENT_ID?.trim()
+    || (allowLocalhostRedirect && redirectUri === localhostRedirect ? LOCAL_TRAKT_CLIENT_ID : '');
   if (!clientId || !redirectUri || !globalThis.crypto?.subtle) return;
   const webCredentials: StorageAdapter = {
     getItem: key => sessionStorage.getItem(key),
@@ -23,7 +26,7 @@ export async function initializeTrakt() {
   };
   await configureTrakt({
     clientId, redirectUri, credentials: desktop?.credentials ?? webCredentials, storage: localStorage,
-    allowLocalhostRedirect: localWeb,
+    allowLocalhostRedirect,
     makeProof: async () => {
       const state = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
       const verifier = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));

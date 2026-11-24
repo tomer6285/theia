@@ -53,8 +53,11 @@ export function installTraktHandlers(window: () => BrowserWindow | null, appDocu
     checkSender(event);
     const url = new URL(input);
     if (url.origin !== 'https://auth.trakt.tv' || url.pathname !== '/oauth/authorize') throw new Error('Invalid Trakt sign-in URL.');
-    const callback = new URL(url.searchParams.get('redirect_uri') || '');
-    if (callback.protocol !== 'https:') throw new Error('Trakt requires an HTTPS callback.');
+    const redirectUri = url.searchParams.get('redirect_uri') || '';
+    const callback = new URL(redirectUri);
+    if (callback.protocol !== 'https:' && redirectUri !== 'http://localhost:3000/') {
+      throw new Error('Trakt requires an HTTPS callback or the exact localhost callback.');
+    }
     const popup = new BrowserWindow({
       parent: window() ?? undefined, modal: true, width: 640, height: 760,
       webPreferences: { nodeIntegration: false, sandbox: true, contextIsolation: true, partition: 'theia-trakt-oauth' },
