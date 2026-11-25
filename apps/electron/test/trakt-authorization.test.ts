@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createServer } from 'node:http';
 
 const { fetch, openExternal } = vi.hoisted(() => ({
   fetch: vi.fn<typeof globalThis.fetch>(),
@@ -16,11 +17,63 @@ const callback = 'https://relay.example/trakt/callback';
 const state = 's'.repeat(43);
 const url = new URL('https://auth.trakt.tv/oauth/authorize');
 url.search = new URLSearchParams({ redirect_uri: callback, state }).toString();
+const localUrl = new URL(url);
+localUrl.searchParams.set('redirect_uri', 'http://localhost:3000/');
 
 describe('desktop Trakt authorization', () => {
   beforeEach(() => {
     fetch.mockReset();
     openExternal.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('receives the local browser callback and releases port 3000', async () => {
+    const request = (path: string) => globalThis.fetch('http://localhost:3000' + path);
+    let browserRequests: Promise<string[]> | undefined;
+    openExternal.mockImplementationOnce(() => {
+      browserRequests = (async () => {
+        const wrongState = await request('/?state=wrong&code=wrong');
+        const wrongPath = await request('/other?state=' + state + '&code=wrong');
+        const success = await request('/?state=' + state + '&code=local-code');
+        return Promise.all([wrongState.text(), wrongPath.text(), success.text()]);
+      })();
+      return browserRequests.then(() => undefined);
+    });
+    expect(await authorizeTrakt(localUrl, new AbortController().signal))
+      .toBe('http://localhost:3000/?state=' + state + '&code=local-code');
+    expect(await browserRequests).toEqual([
+      expect.stringContaining('invalid'), expect.stringContaining('invalid'), expect.stringContaining('Return to Theia'),
+    ]);
+    expect(openExternal).toHaveBeenCalledWith(localUrl.href);
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(request('/')).rejects.toThrow();
+  });
+
+  it('releases the local listener on cancellation', async () => {
+    const controller = new AbortController();
+    openExternal.mockImplementationOnce(async () => { controller.abort(); });
+    expect(await authorizeTrakt(localUrl, controller.signal)).toBeUndefined();
+    await expect(globalThis.fetch('http://127.0.0.1:3000/')).rejects.toThrow();
+  });
+
+  it('reports an occupied loopback port before opening the browser', async () => {
+    const server = createServer();
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(3000, '127.0.0.1', resolve);
+    });
+    try {
+      await expect(authorizeTrakt(localUrl, new AbortController().signal)).rejects.toThrow('Port 3000 is in use');
+      expect(openExternal).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
+  it('rejects other HTTP callbacks', async () => {
+    const otherUrl = new URL(localUrl);
+    otherUrl.searchParams.set('redirect_uri', 'http://localhost:3001/');
+    await expect(authorizeTrakt(otherUrl, new AbortController().signal)).rejects.toThrow('requires');
+    expect(openExternal).not.toHaveBeenCalled();
   });
 
   it('registers before opening the browser and returns the callback to Theia', async () => {

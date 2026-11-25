@@ -1,16 +1,83 @@
 import { randomBytes } from 'node:crypto';
+import { createServer, type RequestListener, type Server } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 import { net, shell } from 'electron';
 
 const lifetime = 10 * 60 * 1000;
+const localhostCallback = 'http://localhost:3000/';
+
+async function authorizeLocally(url: URL, state: string, signal: AbortSignal) {
+  const deadline = AbortSignal.timeout(lifetime);
+  const active = AbortSignal.any([signal, deadline]);
+  const servers: Server[] = [];
+  let complete: (callback: string | undefined) => void = () => {};
+  const result = new Promise<string | undefined>(resolve => { complete = resolve; });
+  const cancel = () => complete(undefined);
+  const receive: RequestListener = (request, response) => {
+    const target = request.url ?? '';
+    const callback = new URL(localhostCallback);
+    const query = new URLSearchParams(target.startsWith('/?') ? target.slice(2) : '');
+    const code = query.get('code');
+    const denied = query.get('error') === 'access_denied';
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    if (request.method !== 'GET' || request.headers.host !== callback.host
+      || query.get('state') !== state || (!code && !denied)) {
+      response.writeHead(400).end('This Trakt sign-in request is invalid or has expired.');
+      return;
+    }
+    if (code && !denied) callback.search = new URLSearchParams({ state, code }).toString();
+    response.end(denied ? 'Trakt sign-in cancelled. Return to Theia.' : 'Return to Theia to finish connecting Trakt.',
+      () => complete(denied ? undefined : callback.href));
+  };
+
+  try {
+    if (signal.aborted) return;
+    for (const host of ['127.0.0.1', '::1']) {
+      const server = createServer(receive);
+      servers.push(server);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          server.once('error', reject);
+          server.listen(3000, host, () => {
+            server.removeListener('error', reject);
+            resolve();
+          });
+        });
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (host === '::1' && (code === 'EADDRNOTAVAIL' || code === 'EAFNOSUPPORT')) continue;
+        if (code === 'EADDRINUSE') throw new Error('Port 3000 is in use. Close the local server using it and try Trakt sign-in again.');
+        throw new Error('Could not start the local Trakt sign-in listener.');
+      }
+    }
+    active.addEventListener('abort', cancel, { once: true });
+    if (!active.aborted) {
+      const openBrowser = shell.openExternal(url.href).catch(() => {
+        throw new Error('Could not open your browser for Trakt sign-in.');
+      });
+      const callback = await Promise.race([result, openBrowser.then(() => result)]);
+      if (!active.aborted) return callback;
+    }
+    if (deadline.aborted && !signal.aborted) throw new Error('Trakt sign-in expired. Try again.');
+  } finally {
+    active.removeEventListener('abort', cancel);
+    for (const server of servers) {
+      server.close();
+      server.closeAllConnections();
+    }
+  }
+}
 
 export async function authorizeTrakt(url: URL, signal: AbortSignal) {
   const state = url.searchParams.get('state');
-  const callback = new URL(url.searchParams.get('redirect_uri') || '');
-  if (!state || !/^[A-Za-z0-9_-]{43}$/.test(state)
-    || callback.protocol !== 'https:' || callback.pathname !== '/trakt/callback'
+  const redirectUri = url.searchParams.get('redirect_uri') || '';
+  if (!state || !/^[A-Za-z0-9_-]{43}$/.test(state)) throw new Error('Invalid Trakt sign-in state.');
+  if (redirectUri === localhostCallback) return authorizeLocally(url, state, signal);
+  const callback = new URL(redirectUri);
+  if (callback.protocol !== 'https:' || callback.pathname !== '/trakt/callback'
     || callback.username || callback.password || callback.search || callback.hash) {
-    throw new Error('Trakt desktop sign-in requires an HTTPS /trakt/callback redirect.');
+    throw new Error('Trakt desktop sign-in requires the default localhost callback or an HTTPS /trakt/callback redirect.');
   }
 
   const endpoint = new URL('/trakt/attempt', callback);

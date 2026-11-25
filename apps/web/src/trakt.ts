@@ -10,7 +10,7 @@ const bytesToBase64Url = (bytes: Uint8Array) =>
 
 export async function initializeTrakt() {
   const desktop = window.theiaElectron?.trakt;
-  const allowLocalhostRedirect = !desktop && location.origin === LOCAL_TRAKT_ORIGIN;
+  const allowLocalhostRedirect = Boolean(desktop) || location.origin === LOCAL_TRAKT_ORIGIN;
   const localhostRedirect = LOCAL_TRAKT_ORIGIN + '/';
   const configuredRedirect = desktop
     ? import.meta.env.VITE_TRAKT_DESKTOP_REDIRECT_URI
