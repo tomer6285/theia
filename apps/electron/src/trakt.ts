@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, net, safeStorage, type IpcMainInvokeEvent 
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const domains = new Set(['https://auth.trakt.tv', 'https://trakt.tv', 'https://app.trakt.tv']);
+import { authorizeTrakt } from './trakt-authorization';
 const methods = new Set(['GET', 'POST', 'DELETE']);
 
 export function installTraktHandlers(window: () => BrowserWindow | null, appDocument: () => string) {
@@ -49,34 +49,27 @@ export function installTraktHandlers(window: () => BrowserWindow | null, appDocu
     return { body: await response.text(), status: response.status, headers: Object.fromEntries(response.headers.entries()) };
   });
 
-  ipcMain.handle('trakt:authorize', (event, input: string) => {
+  let authorization: AbortController | undefined;
+  ipcMain.handle('trakt:cancel-authorization', event => {
+    checkSender(event);
+    authorization?.abort();
+  });
+
+  ipcMain.handle('trakt:authorize', async (event, input: string) => {
     checkSender(event);
     const url = new URL(input);
     if (url.origin !== 'https://auth.trakt.tv' || url.pathname !== '/oauth/authorize') throw new Error('Invalid Trakt sign-in URL.');
-    const redirectUri = url.searchParams.get('redirect_uri') || '';
-    const callback = new URL(redirectUri);
-    if (callback.protocol !== 'https:' && redirectUri !== 'http://localhost:3000/') {
-      throw new Error('Trakt requires an HTTPS callback or the exact localhost callback.');
+    if (authorization) throw new Error('Trakt sign-in is already in progress.');
+    const controller = new AbortController();
+    authorization = controller;
+    const contents = event.sender;
+    const cancel = () => controller.abort();
+    contents.once('destroyed', cancel);
+    try {
+      return await authorizeTrakt(url, controller.signal);
+    } finally {
+      contents.removeListener('destroyed', cancel);
+      authorization = undefined;
     }
-    const popup = new BrowserWindow({
-      parent: window() ?? undefined, modal: true, width: 640, height: 760,
-      webPreferences: { nodeIntegration: false, sandbox: true, contextIsolation: true, partition: 'theia-trakt-oauth' },
-    });
-    return new Promise<string | undefined>((resolve) => {
-      const timeout = setTimeout(() => popup.close(), 10 * 60 * 1000);
-      popup.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-      const navigate = (event: Electron.Event, target: string) => {
-        const next = new URL(target);
-        if (next.origin === callback.origin && next.pathname === callback.pathname) {
-          event.preventDefault();
-          resolve(next.href);
-          popup.close();
-        } else if (!domains.has(next.origin)) event.preventDefault();
-      };
-      popup.webContents.on('will-redirect', navigate);
-      popup.webContents.on('will-navigate', navigate);
-      popup.on('closed', () => { clearTimeout(timeout); resolve(undefined); });
-      void popup.loadURL(url.href).catch(() => { if (!popup.isDestroyed()) popup.close(); });
-    });
   });
 }

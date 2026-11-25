@@ -4,6 +4,7 @@ const electronApi = {
   isElectron: true,
   trakt: {
     authorize: (url: string) => ipcRenderer.invoke("trakt:authorize", url),
+    cancelAuthorization: () => ipcRenderer.invoke("trakt:cancel-authorization"),
     request: (url: string, method: string, headers: Record<string, string>, body?: string) =>
       ipcRenderer.invoke("trakt:request", url, method, headers, body),
     credentials: {

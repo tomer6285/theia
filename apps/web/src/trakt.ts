@@ -10,7 +10,7 @@ const bytesToBase64Url = (bytes: Uint8Array) =>
 
 export async function initializeTrakt() {
   const desktop = window.theiaElectron?.trakt;
-  const allowLocalhostRedirect = Boolean(desktop) || location.origin === LOCAL_TRAKT_ORIGIN;
+  const allowLocalhostRedirect = !desktop && location.origin === LOCAL_TRAKT_ORIGIN;
   const localhostRedirect = LOCAL_TRAKT_ORIGIN + '/';
   const configuredRedirect = desktop
     ? import.meta.env.VITE_TRAKT_DESKTOP_REDIRECT_URI
@@ -33,7 +33,16 @@ export async function initializeTrakt() {
       const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
       return { state, verifier, challenge: bytesToBase64Url(new Uint8Array(hash)) };
     },
-    authorize: desktop ? url => desktop.authorize(url) : async url => {
+    authorize: desktop ? async (url, signal) => {
+      if (signal?.aborted) return undefined;
+      const cancel = () => { void desktop.cancelAuthorization?.().catch(reportTraktError); };
+      signal?.addEventListener('abort', cancel, { once: true });
+      try {
+        return await desktop.authorize(url);
+      } finally {
+        signal?.removeEventListener('abort', cancel);
+      }
+    } : async url => {
       window.location.assign(url);
       return undefined;
     },

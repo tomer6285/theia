@@ -1,6 +1,14 @@
 name = "theia-edge-proxy"
-main = "src/worker.ts"
+main = "src/cloudflare.ts"
 compatibility_date = "2024-01-01"
 
 # Set ALLOWED_HOSTS to provider/CDN hostnames you trust before public deployment.
 # Example: ALLOWED_HOSTS = "vidlink.pro,vixsrc.to,vidora.su,*.your-cdn.example"
+
+[[durable_objects.bindings]]
+name = "TRAKT_ATTEMPTS"
+class_name = "TraktAttempt"
+
+[[migrations]]
+tag = "trakt-attempts-v1"
+new_sqlite_classes = ["TraktAttempt"]

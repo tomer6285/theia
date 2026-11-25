@@ -60,7 +60,7 @@ describe('watch sync', () => {
   it.each([
     'https://example.com/settings',
     'http://localhost:3000/',
-  ])('validates OAuth state, pulls resume progress, and sends favorite changes via %s', async (redirectUri) => {
+  ])('validates OAuth state, pulls resume progress, and uploads existing favorites via %s', async (redirectUri) => {
     vi.resetModules();
     const {
       configureTrakt, connectTrakt, disconnectTrakt, finishTraktAuthorization, syncTrakt,
@@ -95,15 +95,14 @@ describe('watch sync', () => {
       makeProof: async () => ({ state: 'correct', verifier: 'verifier', challenge: 'challenge' }),
     });
     try {
-      await connectTrakt(false);
-      expect(authorize).toHaveBeenCalledWith(expect.stringContaining('code_challenge_method=S256'));
+      theiaStore.getState().toggleFavorite(movie);
+      await connectTrakt();
+      expect(authorize).toHaveBeenCalledWith(expect.stringContaining('code_challenge_method=S256'), undefined);
       await expect(finishTraktAuthorization(redirectUri + '?code=code&state=wrong')).rejects.toThrow();
       expect(fetch).not.toHaveBeenCalled();
       await finishTraktAuthorization(redirectUri + '?code=code&state=correct');
       await syncTrakt();
       expect(traktResumePosition(theiaStore.getState().getProgress(movie.id), 1000)).toBe(420);
-      theiaStore.getState().toggleFavorite(movie);
-      await syncTrakt();
       expect(remoteFavorite).toBe(true);
       expect(theiaStore.getState().favorites.map(item => item.id)).toEqual([movie.id]);
     } finally {
