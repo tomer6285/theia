@@ -1,5 +1,5 @@
 import React, { useState, useSyncExternalStore } from 'react';
-import { Button, ScrollView, Switch, Text, View } from 'react-native';
+import { Button, ScrollView, Text } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -10,7 +10,6 @@ import {
 
 export default function SettingsScreen() {
   const status = useSyncExternalStore(traktStatus.subscribe, traktStatus.getState);
-  const [upload, setUpload] = useState(false);
   const [busy, setBusy] = useState(false);
   const [backup, setBackup] = useState<ReturnType<typeof readWatchBackup>>();
   const [message, setMessage] = useState('');
@@ -59,13 +58,7 @@ export default function SettingsScreen() {
           ? `Last synced ${new Date(status.lastSync).toLocaleString()}` : 'Connected to Trakt'}</Text>
         <Button title="Sync now" disabled={busy || status.syncing} onPress={() => void run(syncTrakt, reportTraktError)} />
         <Button title="Disconnect" disabled={busy} onPress={() => void run(disconnectTrakt, reportTraktError)} />
-      </> : <>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Switch accessibilityLabel="Upload existing watch records" value={upload} onValueChange={setUpload} />
-          <Text style={{ color: '#fff', flex: 1 }}>Upload existing watch history, progress, and favorites</Text>
-        </View>
-        <Button title="Connect Trakt" disabled={busy} onPress={() => void run(() => connectTrakt(upload), reportTraktError)} />
-      </>}
+      </> : <Button title="Connect Trakt" disabled={busy} onPress={() => void run(connectTrakt, reportTraktError)} />}
       {!!status.error && <Text accessibilityLiveRegion="polite" style={{ color: '#fff' }}>{status.error}</Text>}
     </>}
   </ScrollView>;

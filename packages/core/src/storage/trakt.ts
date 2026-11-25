@@ -6,7 +6,7 @@ const API = 'https://api.trakt.tv';
 const AUTH = 'https://auth.trakt.tv';
 const STORAGE = 'theia_trakt_sync_v1';
 type Tokens = { access_token: string; refresh_token: string; expires_in: number; expiresAt: number };
-type OAuthAttempt = { state: string; verifier: string; upload: boolean; startedAt: number };
+type OAuthAttempt = { state: string; verifier: string; startedAt: number };
 export interface TraktPlatform {
   clientId: string;
   redirectUri: string;
@@ -15,7 +15,7 @@ export interface TraktPlatform {
   storage: StorageAdapter;
   fetch?: typeof fetch;
   makeProof: () => Promise<{ state: string; verifier: string; challenge: string }>;
-  authorize: (url: string) => Promise<string | undefined>;
+  authorize: (url: string, signal?: AbortSignal) => Promise<string | undefined>;
 }
 type PlaybackAction = 'start' | 'pause' | 'stop';
 type Target = { movie: { ids: { imdb: string } } } | {
@@ -238,21 +238,27 @@ export async function finishTraktAuthorization(callback: string) {
   const account = settings.user?.ids?.uuid ?? settings.user?.ids?.slug;
   if (typeof account !== 'string' || !account) throw new Error('Could not identify your Trakt account.');
   await config.credentials.setItem(STORAGE, JSON.stringify({ tokens, account }));
-  await restore(config, tokens, account, attempt.upload);
+  await restore(config, tokens, account, true);
 }
 
-export async function connectTrakt(upload: boolean) {
-  if (!platform || connection) return;
+export async function connectTrakt(signal?: AbortSignal) {
+  if (!platform || connection || signal?.aborted) return;
   const config = platform;
   const { state, verifier, challenge } = await config.makeProof();
-  await config.credentials.setItem(`${STORAGE}:oauth`, JSON.stringify({ state, verifier, upload, startedAt: Date.now() }));
+  if (signal?.aborted) return;
+  await config.credentials.setItem(`${STORAGE}:oauth`, JSON.stringify({ state, verifier, startedAt: Date.now() }));
   const url = new URL(`${AUTH}/oauth/authorize`);
   url.search = new URLSearchParams({
     response_type: 'code', client_id: config.clientId, redirect_uri: config.redirectUri,
     state, code_challenge: challenge, code_challenge_method: 'S256',
   }).toString();
-  const callback = await config.authorize(url.href);
-  if (callback) await finishTraktAuthorization(callback);
+  try {
+    if (signal?.aborted) return;
+    const callback = await config.authorize(url.href, signal);
+    if (callback && !signal?.aborted) await finishTraktAuthorization(callback);
+  } finally {
+    if (signal?.aborted) await config.credentials.removeItem(`${STORAGE}:oauth`);
+  }
 }
 
 export async function disconnectTrakt() {

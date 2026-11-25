@@ -81,10 +81,10 @@ To enable Trakt in a build, register a Trakt API app and configure its redirect 
 
 - **Web** needs its production HTTPS origin registered for Trakt CORS. The redirect URI must serve the Theia app, such as its root URL. The connection lasts for the browser tab's session.
 - **Local web** defaults to Theia's Trakt Development client ID and the `http://localhost:3000/` callback when opened at `http://localhost:3000`. To use your own Trakt Development app, override `VITE_TRAKT_CLIENT_ID` and register `http://localhost:3000/` as the redirect URI and `http://localhost:3000` as the allowed origin. Every other callback requires HTTPS.
-- **Electron** defaults to the same Trakt Development client ID and callback. It intercepts the callback in the sign-in window, so no localhost server is needed. For a different callback, configure the desktop redirect URI and matching client ID. Electron saves credentials using the system keyring.
+- **Electron** opens Trakt in the default browser so users can sign in with Google, Apple, or email. Deploy the edge worker from `services/edge-proxy` with its `TRAKT_ATTEMPTS` Durable Object binding on an HTTPS domain you control. Register the exact `https://<worker-domain>/trakt/callback` URI in the Trakt app and use it for `VITE_TRAKT_DESKTOP_REDIRECT_URI`. Set `VITE_TRAKT_CLIENT_ID` to the matching public client ID before rebuilding. The desktop app exchanges the authorization code locally and saves credentials using the system keyring.
 - **Android** needs an HTTPS callback ending in `/settings` on a domain you control. Serve `/.well-known/assetlinks.json` for `com.theia.app` with the installed APK signing certificate's SHA-256 fingerprint. Use a callback distinct from the Web callback and rebuild the APK after configuring the domain.
 
-Connect the same account in Settings on each device. Enable the upload checkbox if you want to merge existing local records into Trakt. Trakt stores remote resume points on pause or exit and logs a completed viewing around its 80% threshold. Automatic scrobbling is available for direct playback. Unsynced changes retry when the connection is available again.
+Connect the same account in Settings on each device. Connecting merges existing local watch history, progress, and favorites into Trakt. Trakt stores remote resume points on pause or exit and logs a completed viewing around its 80% threshold. Automatic scrobbling is available for direct playback. Unsynced changes retry when the connection is available again.
 
 ## Playback behavior and limits
 
