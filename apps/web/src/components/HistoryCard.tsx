@@ -1,6 +1,9 @@
 import React, { useId, useState } from 'react';
 import { MediaItem, WatchHistoryItem, theiaStore } from '@theia/core';
-import { colors, MediaCard } from '@theia/ui';
+import { HistoryConfirmation } from './HistoryConfirmation';
+import { useHistoryArtwork } from './HistoryMediaCard';
+import { HistoryOptions } from './HistoryOptions';
+import styles from './HistoryCard.module.css';
 
 export function groupHistory(history: WatchHistoryItem[]): WatchHistoryItem[][] {
   const groups = new Map<string, WatchHistoryItem[]>();
@@ -29,89 +32,133 @@ function episodeDetails(entry: WatchHistoryItem, entries: WatchHistoryItem[]) {
   };
 }
 
-const actionStyle: React.CSSProperties = {
-  background: 'none', border: 'none', minHeight: 44, cursor: 'pointer',
-  padding: '8px 0', textAlign: 'left', color: colors.accent.primary,
-};
-
 export const HistoryCard: React.FC<{
   entries: WatchHistoryItem[];
   onSelectMedia: (media: MediaItem, episodeId?: string) => void;
 }> = ({ entries, onSelectMedia }) => {
   const [expanded, setExpanded] = useState(false);
+  const [removal, setRemoval] = useState<{ entry: WatchHistoryItem; label: string } | 'title'>();
+  const [failedArtwork, setFailedArtwork] = useState<string>();
   const panelId = useId();
   const { media, progress } = entries[0];
+  const artwork = useHistoryArtwork(media);
   const isShow = media.type === 'series';
-  const episodes = entries.filter(entry => entry.progress.episodeId);
-  const seasons = new Map<number | undefined, WatchHistoryItem[]>();
-  for (const entry of [...entries].sort((a, b) => {
-    const first = episodeDetails(a, entries);
-    const second = episodeDetails(b, entries);
-    return (first.season ?? Infinity) - (second.season ?? Infinity)
-      || (first.episode ?? Infinity) - (second.episode ?? Infinity);
-  })) {
-    const season = episodeDetails(entry, entries).season;
-    seasons.set(season, [...(seasons.get(season) ?? []), entry]);
+  const episodeCount = entries.filter(entry => entry.progress.episodeId).length;
+  const episodeCountLabel = `${episodeCount} ${episodeCount === 1 ? 'episode' : 'episodes'} watched`;
+  const latestEpisode = episodeDetails(entries[0], entries).label;
+  const percentage = Math.max(0, Math.min(100, progress.percentage));
+  const canResume = !progress.completed && (progress.positionSeconds > 0 || percentage > 0);
+  const remainingMinutes = Math.round(Math.max(0, progress.durationSeconds - progress.positionSeconds) / 60);
+  const status = progress.completed
+    ? (isShow ? '✓ Episode completed' : '✓ Completed')
+    : canResume && remainingMinutes > 0 ? `${remainingMinutes} min left` : 'In progress';
+  const isFavorite = theiaStore.getState().isFavorite(media.id);
+  const closeConfirmation = () => setRemoval(undefined);
+  const removalKind = removal === 'title' ? (isShow ? 'show' : 'movie') : 'episode';
+
+  const seasons = new Map<number | undefined, { entry: WatchHistoryItem; label: string }[]>();
+  if (expanded) {
+    const sorted = entries.map(entry => ({ entry, ...episodeDetails(entry, entries) }))
+      .sort((a, b) => (a.season ?? Infinity) - (b.season ?? Infinity)
+        || (a.episode ?? Infinity) - (b.episode ?? Infinity));
+    for (const item of sorted) {
+      const season = seasons.get(item.season);
+      if (season) season.push(item);
+      else seasons.set(item.season, [item]);
+    }
   }
+
   const remove = (entry: WatchHistoryItem) =>
     theiaStore.getState().removeHistoryEntry(entry.media.id, entry.progress.episodeId);
 
   return (
-    <div style={{ minWidth: 0, alignSelf: 'start' }}>
-      <MediaCard media={media} width="100%" progress={progress}
-        onPress={() => onSelectMedia(media, isShow ? undefined : progress.episodeId)}
-        onQuickPlay={() => onSelectMedia(media, progress.episodeId)}
-        isFavorite={theiaStore.getState().isFavorite(media.id)}
-        onToggleFavorite={() => theiaStore.getState().toggleFavorite(media)} />
-      {isShow && (
-        <>
-          <p style={{ color: colors.text.secondary, fontSize: 12, margin: '8px 0 4px' }}>
-            Last watched: {episodeDetails(entries[0], entries).label}
-          </p>
-          <p style={{ color: colors.text.muted, fontSize: 12, margin: 0 }}>
-            {episodes.length} {episodes.length === 1 ? 'episode' : 'episodes'} watched
-          </p>
-          <button type="button" style={actionStyle} aria-expanded={expanded}
-            aria-controls={panelId} aria-label={`Episode history for ${media.title}`}
-            onClick={() => setExpanded(value => !value)}>
-            Episode history {expanded ? '▴' : '▾'}
-          </button>
-          {expanded && (
-            <div id={panelId} style={{ borderTop: `1px solid ${colors.border.subtle}` }}>
-              {[...seasons].map(([season, items]) => (
-                <section key={season ?? 'unknown'} aria-label={season === undefined ? 'Other episodes' : `Season ${season}`}>
-                  <h4 style={{ color: colors.text.secondary, margin: '12px 0 4px', fontSize: 13 }}>
-                    {season === undefined ? 'Other episodes' : `Season ${season}`}
-                  </h4>
-                  {items.map(entry => {
-                    const label = episodeDetails(entry, entries).label;
-                    return (
-                      <div key={entry.progress.episodeId ?? 'series'} style={{ padding: '4px 0 8px' }}>
-                        <button type="button" style={{ ...actionStyle, width: '100%' }}
-                          onClick={() => onSelectMedia(entry.media, entry.progress.episodeId)}>{label}</button>
-                        <progress aria-label={`${label} progress`} max={100}
-                          value={entry.progress.completed ? 100 : entry.progress.percentage}
-                          style={{ width: '100%', accentColor: colors.accent.primary }} />
-                        <span style={{ color: colors.text.muted, fontSize: 12 }}>
-                          {entry.progress.completed ? 'Completed' : `${Math.round(entry.progress.percentage)}% watched`}
-                        </span>
-                        <button type="button" aria-label={`Remove ${media.title} ${label} from History`}
-                          style={{ ...actionStyle, color: colors.status.danger, display: 'block' }}
-                          onClick={() => remove(entry)}>Remove episode</button>
-                      </div>
-                    );
-                  })}
-                </section>
-              ))}
-            </div>
+    <article className={styles.row}>
+      <div className={styles.item}>
+        <button type="button" className={styles.titleButton} aria-label={`View ${media.title}`}
+          onClick={() => onSelectMedia(media, isShow ? undefined : progress.episodeId)}>
+          <span className={styles.poster}>
+            {artwork && artwork !== failedArtwork
+              ? <img src={artwork} alt="" loading="lazy" decoding="async" onError={() => setFailedArtwork(artwork)} />
+              : <span aria-hidden="true">{media.title.slice(0, 1)}</span>}
+          </span>
+          <span className={styles.titleText}>
+            <span className={styles.name}>{media.title}</span>
+            <span className={styles.meta}>
+              {isShow ? `${latestEpisode} · ${episodeCountLabel}` : media.year || 'Movie'}
+            </span>
+          </span>
+        </button>
+        <div className={styles.state}>
+          <span className={styles.meta}>{status}</span>
+          {!progress.completed && (
+            <progress className={styles.progress} aria-label={`${media.title} playback progress`} max={100} value={percentage} />
           )}
-        </>
+        </div>
+        <div className={styles.tools}>
+          {canResume && (
+            <button type="button" className={styles.resume} aria-label={`Resume ${media.title}`}
+              onClick={() => onSelectMedia(media, progress.episodeId)}>
+              <span aria-hidden="true">▶</span><span className={styles.resumeLabel}>Resume</span>
+            </button>
+          )}
+          {isShow && (
+            <button type="button" className={styles.icon} aria-expanded={expanded}
+              aria-controls={panelId} aria-label={`Episode history for ${media.title}`}
+              onClick={() => setExpanded(value => !value)}>
+              <span aria-hidden="true" className={styles.chevron} />
+            </button>
+          )}
+          <HistoryOptions label={`Options for ${media.title}`}>
+            {close => (
+              <>
+                <button type="button" onClick={() => {
+                  close();
+                  theiaStore.getState().toggleFavorite(media);
+                }}>{isFavorite ? 'Remove from favorites' : 'Add to favorites'}</button>
+                <button type="button" className={styles.danger}
+                  aria-label={`Remove ${media.title}${isShow ? ' show' : ''} from History`} onClick={() => {
+                    close();
+                    setRemoval('title');
+                  }}>Remove from history</button>
+              </>
+            )}
+          </HistoryOptions>
+        </div>
+      </div>
+      {isShow && (
+        <div id={panelId} className={styles.episodes} hidden={!expanded}>
+          {[...seasons].map(([season, items]) => {
+            const heading = season === undefined ? 'Other episodes' : `Season ${season}`;
+            return (
+              <section key={season ?? 'unknown'} aria-label={heading} className={styles.season}>
+                <h3>{heading}</h3>
+                {items.map(({ entry, label }) => (
+                  <div key={entry.progress.episodeId ?? 'series'} className={styles.episode}>
+                    <button type="button" className={styles.episodeTitle}
+                      onClick={() => onSelectMedia(entry.media, entry.progress.episodeId)}>{label}</button>
+                    <span className={styles.meta}>
+                      {entry.progress.completed ? 'Completed' : `${Math.round(entry.progress.percentage)}% watched`}
+                    </span>
+                    <button type="button" className={styles.icon} aria-label={`Remove ${media.title} ${label} from History`}
+                      onClick={() => setRemoval({ entry, label })}>×</button>
+                  </div>
+                ))}
+              </section>
+            );
+          })}
+        </div>
       )}
-      <button type="button" aria-label={`Remove ${media.title}${isShow ? ' show' : ''} from History`}
-        onClick={() => entries.forEach(remove)}
-        style={{ ...actionStyle, color: colors.status.danger, display: 'block' }}>
-        {isShow ? 'Remove show from history' : 'Remove from History'}
-      </button>
-    </div>
+      {removal && (
+        <HistoryConfirmation title={`Remove ${removalKind} from history?`} action={`Remove ${removalKind}`}
+          onCancel={closeConfirmation} onConfirm={() => {
+            closeConfirmation();
+            if (removal === 'title') entries.forEach(remove);
+            else remove(removal.entry);
+          }}>
+          This will remove <strong>{media.title}{removal !== 'title' && ` · ${removal.label}`}</strong>{' '}
+          and its saved watch progress from your history.
+        </HistoryConfirmation>
+      )}
+    </article>
   );
 };

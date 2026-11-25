@@ -1,9 +1,10 @@
 import { useWatchState } from '@theia/ui';
 import React, { useEffect, useState } from 'react';
 import { theiaStore, MediaItem, getContinueWatching, CONTINUE_WATCHING_MAX_AGE_MS } from '@theia/core';
-import { colors, MediaCard } from '@theia/ui';
+import { colors } from '@theia/ui';
 
 import { ContinueWatchingActions } from './ContinueWatchingActions';
+import { HistoryMediaCard } from './HistoryMediaCard';
 
 interface ContinueWatchingViewProps {
   onSelectMedia: (media: MediaItem, episodeId?: string) => void;
@@ -89,7 +90,7 @@ export const ContinueWatchingView: React.FC<ContinueWatchingViewProps> = ({ onSe
             const resume = () => (onQuickPlay || onSelectMedia)(media, episodeId);
             return (
               <ContinueWatchingActions key={media.id} media={media}>
-                <MediaCard media={media} variant="continue" width="100%"
+                <HistoryMediaCard media={media} variant="continue" width="100%"
                   onPress={() => onSelectMedia(media, episodeId)} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12,
                   fontSize: 13, color: colors.text.secondary, minWidth: 0 }}>
