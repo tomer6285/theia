@@ -69,7 +69,7 @@ Direct streams use Expo AV with native controls, saved resume positions, request
 
 ## Watch backup and Trakt sync
 
-Use **Settings → Watch backup** to export progress, history, and favorites as JSON or merge a backup from another device. Backups work offline and exclude credentials and playback settings.
+Use **Settings → Watch backup** to export progress, history, favorites, and custom lists as JSON or merge a backup from another device. Backups work offline and exclude credentials and playback settings.
 
 To enable Trakt in a build, register a Trakt API app and configure its redirect URIs. Use the public client ID with PKCE. The integration uses these environment variables at build time.
 

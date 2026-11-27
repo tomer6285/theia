@@ -1,0 +1,105 @@
+.lists, .picker, .panel {
+  display: grid;
+  gap: 12px;
+}
+
+.picker {
+  justify-items: start;
+  margin-block: 10px;
+}
+
+.picker > span:empty {
+  display: none;
+}
+
+.panel {
+  justify-items: start;
+}
+
+.controls, .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls h2 {
+  flex: 1 1 160px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lists button[type], .picker button, .lists select, .lists input, .picker input {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 12px;
+  background: #24242b;
+  border: 1px solid #42424b;
+  border-radius: 8px;
+  color: #fafafa;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.lists button:disabled, .picker button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.picker button, .lists select {
+  cursor: pointer;
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.items li {
+  border: 1px solid #42424b;
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.items .dropTarget {
+  border-color: #68d8e9;
+}
+
+.lists .items .title {
+  flex: 1 1 150px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: start;
+  border: 0;
+  background: transparent;
+}
+
+.title img {
+  width: 36px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.title small {
+  display: block;
+  color: #a1a9b4;
+}
+
+.handle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.handle:active {
+  cursor: grabbing;
+}

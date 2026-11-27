@@ -55,7 +55,7 @@ export function WatchBackupSettings() {
       <div className={styles.row}>
         <div>
           <h4>Export backup</h4>
-          <p>Save your watch history, playback progress, and favorites as a JSON file.</p>
+          <p>Save your watch history, playback progress, favorites, and custom lists as a JSON file.</p>
         </div>
         <button type="button" className={`${styles.action} ${styles.accent}`} onClick={download}>
           <svg viewBox="0 0 24 24" aria-hidden="true">

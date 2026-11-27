@@ -75,7 +75,10 @@ export default function HomeScreen() {
         <Text style={styles.headerTitle}>
           The<Text style={{ color: '#06b6d4' }}>ia</Text>
         </Text>
-        <TouchableOpacity style={{ marginLeft: "auto" }} onPress={() => router.push("/settings")} accessibilityRole="button"><Text style={{ color: "#67e8f9" }}>Settings</Text></TouchableOpacity>
+        <TouchableOpacity style={{ marginLeft: 'auto', padding: 8 }} onPress={() => router.push('/lists')} accessibilityRole="button">
+          <Text style={{ color: '#67e8f9' }}>Lists</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/settings")} accessibilityRole="button"><Text style={{ color: "#67e8f9" }}>Settings</Text></TouchableOpacity>
       </View>
 
       {/* Search Input */}

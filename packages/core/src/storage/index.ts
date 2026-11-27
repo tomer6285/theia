@@ -30,6 +30,14 @@ export class DefaultStorageAdapter implements StorageAdapter {
   }
 }
 
+export interface Watchlist {
+  id: string;
+  name: string;
+  items: MediaItem[];
+}
+
+export const watchlistItemKey = (media: MediaItem) => `${media.type}:${media.id}`;
+
 export interface WatchState {
   progress: Record<string, WatchProgress>;
   history: Array<{
@@ -39,12 +47,20 @@ export interface WatchState {
     dismissedFromContinueWatching?: boolean;
   }>;
   favorites: MediaItem[];
+  watchlists: Watchlist[];
   subtitleOffsets: Record<string, number>;
   settings: UserSettings;
 
   updateProgress: (progress: WatchProgress, media?: MediaItem) => void;
   getProgress: (mediaId: string, episodeId?: string) => WatchProgress | undefined;
   toggleFavorite: (media: MediaItem) => void;
+  createWatchlist: (name: string, media?: MediaItem) => string | undefined;
+  renameWatchlist: (id: string, name: string) => void;
+  deleteWatchlist: (id: string) => void;
+  addToWatchlist: (id: string, media: MediaItem) => void;
+  removeFromWatchlist: (id: string, itemKey: string) => void;
+  reorderWatchlist: (id: string, itemKey: string, targetKey: string) => void;
+  moveBetweenWatchlists: (sourceId: string, destinationId: string, itemKey: string) => void;
   isFavorite: (mediaId: string) => boolean;
   setSubtitleOffset: (mediaId: string, offsetMs: number) => void;
   getSubtitleOffset: (mediaId: string) => number;
@@ -72,7 +88,7 @@ let currentAdapter: StorageAdapter = new DefaultStorageAdapter();
 const STORAGE_KEY = 'theia_store';
 const LEGACY_STORAGE_KEY = 'dion_tc_store';
 
-type PersistedState = Pick<WatchState, 'progress' | 'history' | 'favorites' | 'subtitleOffsets' | 'settings'>;
+type PersistedState = Pick<WatchState, 'progress' | 'history' | 'favorites' | 'watchlists' | 'subtitleOffsets' | 'settings'>;
 const isRecord = (value: unknown): value is Record<string, any> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const isMedia = (value: unknown): value is MediaItem =>
@@ -84,6 +100,22 @@ const isProgress = (value: unknown): value is WatchProgress =>
   && ['positionSeconds', 'durationSeconds', 'percentage', 'updatedAt'].every(
     (key) => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0
   ) && typeof value.completed === 'boolean';
+
+function isWatchlist(value: unknown): value is Watchlist {
+  return isRecord(value) && typeof value.id === 'string' && !!value.id.trim()
+    && typeof value.name === 'string' && !!value.name.trim()
+    && Array.isArray(value.items) && value.items.every(isBackupMedia)
+    && new Set(value.items.map(watchlistItemKey)).size === value.items.length;
+}
+
+function readStoredWatchlists(value: unknown): Watchlist[] {
+  if (!Array.isArray(value)) return [];
+  const lists = new Map<string, Watchlist>();
+  for (const list of value) {
+    if (isWatchlist(list) && !lists.has(list.id)) lists.set(list.id, list);
+  }
+  return [...lists.values()];
+}
 
 function parseStoredState(raw: unknown): Partial<PersistedState> {
   if (typeof raw !== 'string') return {};
@@ -115,6 +147,7 @@ function parseStoredState(raw: unknown): Partial<PersistedState> {
         isRecord(h) && isMedia(h.media) && isProgress(h.progress) && Number.isFinite(h.lastWatchedAt)
       ).sort((a, b) => b.lastWatchedAt - a.lastWatchedAt) : [],
       favorites: Array.isArray(parsed.favorites) ? parsed.favorites.filter(isMedia) : [],
+      watchlists: readStoredWatchlists(parsed.watchlists),
       subtitleOffsets: isRecord(parsed.subtitleOffsets)
         ? Object.fromEntries(Object.entries(parsed.subtitleOffsets).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) : {},
     };
@@ -129,7 +162,7 @@ export async function setStorageAdapter(adapter: StorageAdapter): Promise<void> 
   try {
     const raw = await adapter.getItem(STORAGE_KEY) ?? await adapter.getItem(LEGACY_STORAGE_KEY);
     if (adapter === currentAdapter) theiaStore.setState({
-      progress: {}, history: [], favorites: [], subtitleOffsets: {}, settings: { ...DEFAULT_SETTINGS },
+      progress: {}, history: [], favorites: [], watchlists: [], subtitleOffsets: {}, settings: { ...DEFAULT_SETTINGS },
       ...parseStoredState(raw),
     });
   } catch (err) {
@@ -153,19 +186,14 @@ export function loadStoredState(): Partial<PersistedState> {
 
 let pendingWrite: Promise<void> | null = null;
 
-export function saveState(state: {
-  progress: Record<string, WatchProgress>;
-  history: WatchState['history'];
-  favorites: MediaItem[];
-  subtitleOffsets: Record<string, number>;
-  settings: UserSettings;
-}) {
+export function saveState(state: PersistedState) {
   try {
     const adapter = currentAdapter;
     const serialized = JSON.stringify({
         progress: state.progress,
         history: state.history,
         favorites: state.favorites,
+        watchlists: state.watchlists,
         subtitleOffsets: state.subtitleOffsets,
         settings: state.settings,
       });
@@ -186,10 +214,29 @@ export function saveState(state: {
 
 const initialSaved = loadStoredState();
 
+function updateWatchlists(update: (lists: Watchlist[]) => Watchlist[]) {
+  theiaStore.setState(state => {
+    const watchlists = update(state.watchlists);
+    if (watchlists === state.watchlists) return state;
+    saveState({ ...state, watchlists });
+    return { watchlists };
+  });
+}
+
+function updateList(id: string, update: (list: Watchlist) => Watchlist) {
+  updateWatchlists(lists => {
+    const list = lists.find(item => item.id === id);
+    if (!list) return lists;
+    const updated = update(list);
+    return updated === list ? lists : lists.map(item => item === list ? updated : item);
+  });
+}
+
 export const theiaStore = createStore<WatchState>((set, get) => ({
   progress: initialSaved.progress || {},
   history: initialSaved.history || [],
   favorites: initialSaved.favorites || [],
+  watchlists: initialSaved.watchlists || [],
   subtitleOffsets: initialSaved.subtitleOffsets || {},
   settings: { ...DEFAULT_SETTINGS, ...initialSaved.settings },
 
@@ -230,13 +277,7 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
         history: newHistory,
       };
 
-      saveState({
-        progress: updatedProgress,
-        history: newHistory,
-        favorites: state.favorites,
-        subtitleOffsets: state.subtitleOffsets,
-        settings: state.settings,
-      });
+      saveState({ ...state, ...newState });
 
       return newState;
     });
@@ -256,15 +297,69 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
         ? state.favorites.filter((f) => f.id !== media.id)
         : [...state.favorites, media];
 
-      saveState({
-        progress: state.progress,
-        history: state.history,
-        favorites: newFavs,
-        subtitleOffsets: state.subtitleOffsets,
-        settings: state.settings,
-      });
+      saveState({ ...state, favorites: newFavs });
 
       return { favorites: newFavs };
+    });
+  },
+
+  createWatchlist: (name, media) => {
+    name = name.trim();
+    if (!name) return undefined;
+    const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    updateWatchlists(lists => [...lists, { id, name, items: media ? [media] : [] }]);
+    return id;
+  },
+
+  renameWatchlist: (id, name) => {
+    name = name.trim();
+    if (name) updateList(id, list => list.name === name ? list : { ...list, name });
+  },
+
+  deleteWatchlist: id => {
+    updateWatchlists(lists => lists.some(list => list.id === id) ? lists.filter(list => list.id !== id) : lists);
+  },
+
+  addToWatchlist: (id, media) => {
+    const key = watchlistItemKey(media);
+    updateList(id, list => list.items.some(item => watchlistItemKey(item) === key)
+      ? list : { ...list, items: [...list.items, media] });
+  },
+
+  removeFromWatchlist: (id, key) => {
+    updateList(id, list => {
+      const items = list.items.filter(item => watchlistItemKey(item) !== key);
+      return items.length === list.items.length ? list : { ...list, items };
+    });
+  },
+
+  reorderWatchlist: (id, key, targetKey) => {
+    updateList(id, list => {
+      const from = list.items.findIndex(item => watchlistItemKey(item) === key);
+      const to = list.items.findIndex(item => watchlistItemKey(item) === targetKey);
+      if (from < 0 || to < 0 || from === to) return list;
+      const items = [...list.items];
+      const [media] = items.splice(from, 1);
+      items.splice(to, 0, media);
+      return { ...list, items };
+    });
+  },
+
+  moveBetweenWatchlists: (sourceId, destinationId, key) => {
+    if (sourceId === destinationId) return;
+    updateWatchlists(lists => {
+      const source = lists.find(list => list.id === sourceId);
+      const destination = lists.find(list => list.id === destinationId);
+      const media = source?.items.find(item => watchlistItemKey(item) === key);
+      if (!source || !media || !destination) return lists;
+
+      const updatedSource = { ...source, items: source.items.filter(item => watchlistItemKey(item) !== key) };
+      const updatedDestination = destination.items.some(item => watchlistItemKey(item) === key)
+        ? destination : { ...destination, items: [...destination.items, media] };
+      return lists.map(list => {
+        if (list === source) return updatedSource;
+        return list === destination ? updatedDestination : list;
+      });
     });
   },
 
@@ -276,13 +371,7 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
     if (!Number.isFinite(offsetMs)) return;
     set((state) => {
       const newOffsets = { ...state.subtitleOffsets, [mediaId]: offsetMs };
-      saveState({
-        progress: state.progress,
-        history: state.history,
-        favorites: state.favorites,
-        subtitleOffsets: newOffsets,
-        settings: state.settings,
-      });
+      saveState({ ...state, subtitleOffsets: newOffsets });
       return { subtitleOffsets: newOffsets };
     });
   },
@@ -294,13 +383,7 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
   updateSettings: (newSettings: Partial<UserSettings>) => {
     set((state) => {
       const updated = { ...state.settings, ...newSettings };
-      saveState({
-        progress: state.progress,
-        history: state.history,
-        favorites: state.favorites,
-        subtitleOffsets: state.subtitleOffsets,
-        settings: updated,
-      });
+      saveState({ ...state, settings: updated });
       return { settings: updated };
     });
   },
@@ -331,13 +414,7 @@ export const theiaStore = createStore<WatchState>((set, get) => ({
 
   clearHistory: () => {
     set((state) => {
-      saveState({
-        progress: {},
-        history: [],
-        favorites: state.favorites,
-        subtitleOffsets: state.subtitleOffsets,
-        settings: state.settings,
-      });
+      saveState({ ...state, progress: {}, history: [] });
       return { progress: {}, history: [] };
     });
   },
@@ -347,7 +424,7 @@ export const dionStore = theiaStore;
 
 export * from './continueWatching';
 
-type WatchRecords = Pick<PersistedState, 'progress' | 'history' | 'favorites'>;
+type WatchRecords = Pick<PersistedState, 'progress' | 'history' | 'favorites'> & { watchlists?: Watchlist[] };
 
 function isBackupEpisode(value: unknown): boolean {
   return isRecord(value) && typeof value.id === 'string' && typeof value.title === 'string'
@@ -373,13 +450,13 @@ function isBackupProgress(value: unknown): value is WatchProgress {
 }
 
 export function exportWatchBackup(): string {
-  const { progress, history, favorites } = theiaStore.getState();
-  return JSON.stringify({ format: 'theia-watch-backup', version: 1, progress, history, favorites }, null, 2);
+  const { progress, history, favorites, watchlists } = theiaStore.getState();
+  return JSON.stringify({ format: 'theia-watch-backup', version: 2, progress, history, favorites, watchlists }, null, 2);
 }
 
 export function readWatchBackup(raw: string): WatchRecords {
   const data: unknown = JSON.parse(raw);
-  if (!isRecord(data) || data.format !== 'theia-watch-backup' || data.version !== 1
+  if (!isRecord(data) || data.format !== 'theia-watch-backup' || (data.version !== 1 && data.version !== 2)
     || !isRecord(data.progress)
     || !Object.entries(data.progress).every(([key, progress]) =>
       isBackupProgress(progress) && key === (progress.episodeId || progress.mediaId))
@@ -388,11 +465,38 @@ export function readWatchBackup(raw: string): WatchRecords {
       && isBackupProgress(entry.progress) && entry.progress.mediaId === entry.media.id
       && Number.isFinite(entry.lastWatchedAt)
       && (entry.dismissedFromContinueWatching === undefined || typeof entry.dismissedFromContinueWatching === 'boolean'))
-    || !Array.isArray(data.favorites) || !data.favorites.every(isBackupMedia)) {
+    || !Array.isArray(data.favorites) || !data.favorites.every(isBackupMedia)
+    || (data.version === 2 && (!Array.isArray(data.watchlists) || !data.watchlists.every(isWatchlist)
+      || new Set(data.watchlists.map(list => list.id)).size !== data.watchlists.length))) {
     throw new Error('Choose a valid Theia watch backup.');
   }
   const { progress, history, favorites } = data;
-  return { progress, history, favorites };
+  return data.version === 2 ? { progress, history, favorites, watchlists: data.watchlists } : { progress, history, favorites };
+}
+
+function mergeWatchlists(current: Watchlist[], incoming: Watchlist[]): Watchlist[] {
+  const merged = new Map(current.map(list => [list.id, list]));
+  const incomingIds = new Set(incoming.map(list => list.id));
+  for (const list of incoming) {
+    if (!merged.has(list.id)) {
+      merged.set(list.id, list);
+      continue;
+    }
+
+    const copyPrefix = `${list.id}:import:`;
+    const alreadyImported = [...merged.values()].some(existing =>
+      (existing.id === list.id || (existing.id.startsWith(copyPrefix) && !incomingIds.has(existing.id)))
+      && existing.name === list.name && existing.items.length === list.items.length
+      && existing.items.every((item, index) => watchlistItemKey(item) === watchlistItemKey(list.items[index])));
+    if (alreadyImported) continue;
+
+    // Keep both orders when a backup and the current list have diverged.
+    let copy = 1;
+    while (merged.has(`${copyPrefix}${copy}`) || incomingIds.has(`${copyPrefix}${copy}`)) copy++;
+    const id = `${copyPrefix}${copy}`;
+    merged.set(id, { ...list, id });
+  }
+  return [...merged.values()];
 }
 
 export function mergeWatchBackup(backup: WatchRecords): void {
@@ -417,6 +521,7 @@ export function mergeWatchBackup(backup: WatchRecords): void {
       progress: Object.fromEntries(progress),
       history: [...history.values()].sort((a, b) => b.lastWatchedAt - a.lastWatchedAt),
       favorites: [...favorites.values()],
+      watchlists: backup.watchlists?.length ? mergeWatchlists(state.watchlists, backup.watchlists) : state.watchlists,
     };
     saveState({ ...state, ...records });
     return records;
@@ -424,7 +529,9 @@ export function mergeWatchBackup(backup: WatchRecords): void {
 }
 
 export function describeWatchBackup(backup: WatchRecords): string {
-  return `${Object.keys(backup.progress).length} progress records, ${backup.history.length} history entries, and ${backup.favorites.length} favorites.`;
+  const records = `${Object.keys(backup.progress).length} progress records, ${backup.history.length} history entries, and ${backup.favorites.length} favorites`;
+  const count = backup.watchlists?.length ?? 0;
+  return count ? `${records}, plus ${count} custom ${count === 1 ? 'list' : 'lists'}.` : `${records}.`;
 }
 
 export const WATCH_BACKUP_FILENAME = 'theia-watch-backup.json';

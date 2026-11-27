@@ -1,3 +1,4 @@
+import { AddToWatchlist } from './Watchlists';
 import { useWatchState } from '@theia/ui';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -517,6 +518,7 @@ export const MediaDetailModal: React.FC<MediaDetailModalProps> = ({
               {isFav ? '♥' : '♡'}
             </button>
           </div>
+          <AddToWatchlist key={media.id} media={media} />
 
           {media.type === 'series' && !selectedEpisode && <p role="status" style={{ color: colors.text.secondary }}>
             {isLoadingDetails ? 'Loading episode information…' : 'Episode information is unavailable for this series.'}
