@@ -2,7 +2,7 @@
 import React from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { providerManager } from '@theia/core';
+import { DEFAULT_PROFILE_ID, DefaultStorageAdapter, providerManager, setStorageAdapter, theiaStore } from '@theia/core';
 import { App } from '../src/App';
 import type { MediaItem, StreamSource } from '@theia/core';
 const { series, stream } = vi.hoisted(() => ({
@@ -51,3 +51,37 @@ it('aborts a pending next episode when leaving playback', async () => {
   await waitFor(() => expect(signal?.aborted).toBe(true));
   expect(screen.getByText('Open show')).toBeTruthy();
 });
+
+it('opens straight to Home with one profile and asks who is watching on subsequent launches', async () => {
+  const adapter = new DefaultStorageAdapter();
+  await setStorageAdapter(adapter);
+  const first = render(<App />);
+  expect(screen.getByText('Open show')).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  fireEvent.change(screen.getByLabelText('Profile name'), { target: { value: 'Sam' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add profile' }));
+  expect(screen.queryByRole('heading', { name: 'Who’s watching?' })).toBeNull();
+  expect(theiaStore.getState().activeProfileId).toBe(DEFAULT_PROFILE_ID);
+  first.unmount();
+
+  await setStorageAdapter(adapter);
+  const second = render(<App />);
+  expect(screen.getByRole('heading', { name: 'Who’s watching?' })).toBeTruthy();
+  expect(screen.queryByText('Open show')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Sam' }));
+  expect(screen.getByText('Open show')).toBeTruthy();
+  expect(theiaStore.getState().profiles[1].id).toBe(theiaStore.getState().activeProfileId);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Switch to Default' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove Sam' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove profile' }));
+  second.unmount();
+
+  await setStorageAdapter(adapter);
+  render(<App />);
+  expect(screen.getByText('Open show')).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Who’s watching?' })).toBeNull();
+}, 15_000);

@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AppState, View, Text, Pressable, StyleSheet } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { WebView } from 'react-native-webview';
-import { refreshTraktResume, theiaStore, traktResumePosition, traktStatus } from '@theia/core';
+import { refreshTraktResume, theiaStore, traktResumePosition, traktStatus, DEFAULT_PROFILE_ID } from '@theia/core';
 import { VideoPlayerProps } from './types';
 
 /** Native playback uses Expo's video engine; provider embeds use an isolated WebView. */
@@ -18,14 +18,16 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
   }));
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
-  const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+  const profileId = useRef(theiaStore.getState().activeProfileId).current;
+  const saved = theiaStore.getState().getProgress(media.id, episode?.id, profileId);
   const start = useRef(initialTime ?? (theiaStore.getState().settings.autoResume && saved && !saved.completed
     ? saved.positionSeconds : 0));
   const video = useRef<Video>(null);
-  const [resumeReady, setResumeReady] = useState(stream.format === 'embed' || (!saved?.resumeByPercentage && !traktStatus.getState().connected));
+  const usesTrakt = profileId === DEFAULT_PROFILE_ID && traktStatus.getState().connected;
+  const [resumeReady, setResumeReady] = useState(stream.format === 'embed' || (!saved?.resumeByPercentage && !usesTrakt));
   const preparing = useRef(false);
   const mounted = useRef(true);
-  const scrobble = React.useMemo(() => createScrobbleSession(media, episode), [media.id, episode?.id]);
+  const scrobble = React.useMemo(() => createScrobbleSession(media, episode, profileId), [media.id, episode?.id, profileId]);
   const lastSaved = useRef(0);
   const latest = useRef<AVPlaybackStatus | null>(null);
   const save = (status: AVPlaybackStatus, force = false) => {
@@ -45,9 +47,9 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
         const instance = video.current;
         void (async () => {
           if (initialTime === undefined && theiaStore.getState().settings.autoResume) {
-            await refreshTraktResume();
+            await refreshTraktResume(profileId);
             if (!mounted.current || !instance || instance !== video.current) return;
-            const progress = theiaStore.getState().getProgress(media.id, episode?.id);
+            const progress = theiaStore.getState().getProgress(media.id, episode?.id, profileId);
             const position = traktResumePosition(progress, status.durationMillis! / 1000);
             start.current = Math.min(position, Math.max(0, status.durationMillis! / 1000 - 0.001));
             await instance.setPositionAsync(start.current * 1000);
@@ -72,7 +74,7 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
       mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
       positionSeconds: status.positionMillis / 1000, durationSeconds: status.durationMillis / 1000,
       percentage, completed: isPlaybackCompleted(status.positionMillis / 1000, status.durationMillis / 1000, status.didJustFinish, media.type === 'series', stream.creditsStartSeconds, completionPolicy), updatedAt: Date.now(),
-    }, media);
+    }, media, profileId);
     if (!force && status.didJustFinish && hasNextEpisode && theiaStore.getState().settings.autoPlayNext) onNextEpisode?.();
   };
   useEffect(() => {
@@ -80,7 +82,7 @@ export const VideoPlayerNative: React.FC<VideoPlayerProps> = ({
     const flush = () => { if (latest.current) save(latest.current, true); };
     const subscription = AppState.addEventListener('change', state => { if (state !== 'active') flush(); });
     return () => { mounted.current = false; flush(); latest.current = null; subscription.remove(); };
-  }, [media, episode, stream, completionPolicy]);
+  }, [media, episode, stream, completionPolicy, profileId]);
   return (
     <View style={styles.container}>
       {stream.format === 'embed' ? (

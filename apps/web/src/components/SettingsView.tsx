@@ -1,13 +1,13 @@
 import { TraktSettings } from './TraktSettings';
 import { WatchBackupSettings } from './WatchBackupSettings';
+import { HouseholdProfiles } from './HouseholdProfiles';
 import { useWatchState } from '@theia/ui';
 import React, { useState, useRef, useEffect } from 'react';
-import { theiaStore, getDefaultProxyUrl } from '@theia/core';
+import { theiaStore, getDefaultProxyUrl, DEFAULT_PROFILE_ID } from '@theia/core';
 import { colors, TouchPill, TouchSwitch } from '@theia/ui';
 
 export const SettingsView: React.FC = () => {
-  useWatchState();
-  const settings = theiaStore.getState().settings;
+  const { settings, activeProfileId } = useWatchState();
   const [proxyUrl, setProxyUrl] = useState(settings.proxyUrl || '');
   const [autoPlayNext, setAutoPlayNext] = useState(settings.autoPlayNext);
   const [autoResume, setAutoResume] = useState(settings.autoResume);
@@ -47,8 +47,9 @@ export const SettingsView: React.FC = () => {
         </p>
       </div>
 
+      <HouseholdProfiles />
       <WatchBackupSettings />
-      <TraktSettings />
+      {activeProfileId === DEFAULT_PROFILE_ID && <TraktSettings />}
 
       {/* Cloudflare Edge Proxy Config */}
       <div

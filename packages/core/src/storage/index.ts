@@ -38,7 +38,17 @@ export interface Watchlist {
 
 export const watchlistItemKey = (media: MediaItem) => `${media.type}:${media.id}`;
 
+export const DEFAULT_PROFILE_ID = 'default';
+export const PROFILE_NAME_LIMIT = 40;
+
+export interface HouseholdProfile {
+  id: string;
+  name: string;
+}
+
 export interface WatchState {
+  profiles: HouseholdProfile[];
+  activeProfileId: string;
   progress: Record<string, WatchProgress>;
   history: Array<{
     media: MediaItem;
@@ -51,8 +61,8 @@ export interface WatchState {
   subtitleOffsets: Record<string, number>;
   settings: UserSettings;
 
-  updateProgress: (progress: WatchProgress, media?: MediaItem) => void;
-  getProgress: (mediaId: string, episodeId?: string) => WatchProgress | undefined;
+  updateProgress: (progress: WatchProgress, media?: MediaItem, profileId?: string) => void;
+  getProgress: (mediaId: string, episodeId?: string, profileId?: string) => WatchProgress | undefined;
   toggleFavorite: (media: MediaItem) => void;
   createWatchlist: (name: string, media?: MediaItem) => string | undefined;
   renameWatchlist: (id: string, name: string) => void;
@@ -156,47 +166,99 @@ function parseStoredState(raw: unknown): Partial<PersistedState> {
   }
 }
 
+type SubtitleSettings = Pick<UserSettings, 'preferredSubtitles' | 'subtitleOffset'>;
+type ProfileData = Omit<PersistedState, 'settings'> & SubtitleSettings;
+
+const defaultProfile = { id: DEFAULT_PROFILE_ID, name: 'Default' };
+let profileData = new Map<string, ProfileData>();
+
+function splitState({ settings, progress, history, favorites, watchlists, subtitleOffsets }: PersistedState) {
+  const { preferredSubtitles, subtitleOffset, ...deviceSettings } = settings;
+  return { deviceSettings, viewer: { progress, history, favorites, watchlists, subtitleOffsets, preferredSubtitles, subtitleOffset } };
+}
+
+function emptyState(): PersistedState {
+  return { progress: {}, history: [], favorites: [], watchlists: [], subtitleOffsets: {}, settings: { ...DEFAULT_SETTINGS } };
+}
+
+function parseHousehold(raw: unknown) {
+  let parsed: unknown;
+  try { if (typeof raw === 'string') parsed = JSON.parse(raw); } catch { /* use defaults */ }
+  if (isRecord(parsed) && parsed.version === 2 && Array.isArray(parsed.profiles)) {
+    const profiles: HouseholdProfile[] = [];
+    const data = new Map<string, ProfileData>();
+    const { deviceSettings } = splitState({ ...emptyState(), ...parseStoredState(
+      JSON.stringify({ settings: parsed.settings }),
+    ) });
+    for (const entry of parsed.profiles) {
+      if (!isRecord(entry) || typeof entry.id !== 'string' || !entry.id || data.has(entry.id)
+        || typeof entry.name !== 'string' || !entry.name.trim()) continue;
+      profiles.push({ id: entry.id, name: entry.name });
+      data.set(entry.id, splitState({ ...emptyState(), ...parseStoredState(JSON.stringify(entry.data)) }).viewer);
+    }
+    const primary = data.get(DEFAULT_PROFILE_ID);
+    if (primary) {
+      const { preferredSubtitles, subtitleOffset, ...records } = primary;
+      return { data, state: { ...records, settings: { ...deviceSettings, preferredSubtitles, subtitleOffset }, profiles, activeProfileId: DEFAULT_PROFILE_ID } };
+    }
+  }
+  const state = { ...emptyState(), ...parseStoredState(raw) };
+  return {
+    data: new Map([[DEFAULT_PROFILE_ID, splitState(state).viewer]]),
+    state: { ...state, profiles: [defaultProfile], activeProfileId: DEFAULT_PROFILE_ID },
+  };
+}
+
 /** Install and hydrate an asynchronous adapter before mounting the application. */
 export async function setStorageAdapter(adapter: StorageAdapter): Promise<void> {
   currentAdapter = adapter;
   try {
+    await pendingWrite;
     const raw = await adapter.getItem(STORAGE_KEY) ?? await adapter.getItem(LEGACY_STORAGE_KEY);
-    if (adapter === currentAdapter) theiaStore.setState({
-      progress: {}, history: [], favorites: [], watchlists: [], subtitleOffsets: {}, settings: { ...DEFAULT_SETTINGS },
-      ...parseStoredState(raw),
-    });
+    if (adapter === currentAdapter) {
+      const household = parseHousehold(raw);
+      profileData = household.data;
+      theiaStore.setState(household.state);
+    }
   } catch (err) {
     console.error('Failed to load stored state:', err);
   }
 }
 
-export function loadStoredState(): Partial<PersistedState> {
+function readLocalState() {
   try {
     const raw = currentAdapter.getItem(STORAGE_KEY);
     if (raw instanceof Promise) {
-      // Async storage is hydrated by setStorageAdapter, never parsed synchronously.
       void raw.catch(() => {});
-      return {};
+      return undefined;
     }
-    return parseStoredState(raw ?? currentAdapter.getItem(LEGACY_STORAGE_KEY));
+    return raw ?? currentAdapter.getItem(LEGACY_STORAGE_KEY);
   } catch {
-    return {};
+    return undefined;
   }
+}
+
+export function loadStoredState(): Partial<PersistedState> {
+  const raw = readLocalState();
+  if (raw === undefined || raw instanceof Promise) return {};
+  const { profiles, activeProfileId, ...state } = parseHousehold(raw).state;
+  return state;
 }
 
 let pendingWrite: Promise<void> | null = null;
 
-export function saveState(state: PersistedState) {
+function persistHousehold(state: PersistedState, profiles: HouseholdProfile[]) {
   try {
     const adapter = currentAdapter;
+    const { deviceSettings } = splitState(state);
     const serialized = JSON.stringify({
-        progress: state.progress,
-        history: state.history,
-        favorites: state.favorites,
-        watchlists: state.watchlists,
-        subtitleOffsets: state.subtitleOffsets,
-        settings: state.settings,
-      });
+      version: 2,
+      settings: deviceSettings,
+      profiles: profiles.map((profile) => {
+        const { preferredSubtitles, subtitleOffset, ...records } = profileData.get(profile.id)!;
+        return { ...profile, data: { ...records, settings: { preferredSubtitles, subtitleOffset } } };
+      }),
+    });
     // Keep browser writes synchronous (including pagehide), but serialize async adapters.
     const result = pendingWrite
       ? pendingWrite.then(() => adapter.setItem(STORAGE_KEY, serialized))
@@ -212,7 +274,77 @@ export function saveState(state: PersistedState) {
   }
 }
 
-const initialSaved = loadStoredState();
+export function saveState(state: PersistedState) {
+  const { activeProfileId, profiles } = theiaStore.getState();
+  profileData.set(activeProfileId, splitState(state).viewer);
+  persistHousehold(state, profiles);
+}
+
+export function getProfileState(profileId: string): PersistedState | undefined {
+  const state = theiaStore.getState();
+  if (profileId === state.activeProfileId) return state;
+  const viewer = profileData.get(profileId);
+  if (!viewer) return undefined;
+  const { preferredSubtitles, subtitleOffset, ...records } = viewer;
+  return { ...records, settings: { ...state.settings, preferredSubtitles, subtitleOffset } };
+}
+
+function updateProfileState(profileId: string, update: (state: PersistedState) => Partial<PersistedState>) {
+  const viewer = getProfileState(profileId);
+  if (!viewer) return;
+  const changes = update(viewer);
+  const next = { ...viewer, ...changes };
+  const state = theiaStore.getState();
+  if (profileId === state.activeProfileId) {
+    saveState(next);
+    theiaStore.setState(changes);
+  } else {
+    profileData.set(profileId, splitState(next).viewer);
+    persistHousehold(state, state.profiles);
+  }
+}
+
+export function selectProfile(profileId: string) {
+  const state = theiaStore.getState();
+  if (profileId === state.activeProfileId) return;
+  const viewer = getProfileState(profileId);
+  if (!viewer) return;
+  profileData.set(state.activeProfileId, splitState(state).viewer);
+  theiaStore.setState({ ...viewer, activeProfileId: profileId });
+}
+
+function saveProfiles(profiles: HouseholdProfile[]) {
+  const state = theiaStore.getState();
+  profileData.set(state.activeProfileId, splitState(state).viewer);
+  persistHousehold(state, profiles);
+  theiaStore.setState({ profiles });
+}
+
+export function addProfile(name: string): void {
+  name = name.trim().slice(0, PROFILE_NAME_LIMIT);
+  if (!name) return;
+  const { profiles } = theiaStore.getState();
+  const id = `viewer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  profileData.set(id, splitState(emptyState()).viewer);
+  saveProfiles([...profiles, { id, name }]);
+}
+
+export function renameProfile(profileId: string, name: string): void {
+  name = name.trim().slice(0, PROFILE_NAME_LIMIT);
+  if (!name) return;
+  saveProfiles(theiaStore.getState().profiles.map((profile) =>
+    profile.id === profileId ? { ...profile, name } : profile));
+}
+
+export function deleteProfile(profileId: string): void {
+  const { profiles, activeProfileId } = theiaStore.getState();
+  if (profileId === DEFAULT_PROFILE_ID || profileId === activeProfileId || !profileData.delete(profileId)) return;
+  saveProfiles(profiles.filter(({ id }) => id !== profileId));
+}
+
+// Web hydrates before React mounts. Android supplies its adapter at startup.
+const initial = parseHousehold(readLocalState());
+profileData = initial.data;
 
 function updateWatchlists(update: (lists: Watchlist[]) => Watchlist[]) {
   theiaStore.setState(state => {
@@ -233,58 +365,33 @@ function updateList(id: string, update: (list: Watchlist) => Watchlist) {
 }
 
 export const theiaStore = createStore<WatchState>((set, get) => ({
-  progress: initialSaved.progress || {},
-  history: initialSaved.history || [],
-  favorites: initialSaved.favorites || [],
-  watchlists: initialSaved.watchlists || [],
-  subtitleOffsets: initialSaved.subtitleOffsets || {},
-  settings: { ...DEFAULT_SETTINGS, ...initialSaved.settings },
+  ...initial.state,
 
-  updateProgress: (progress: WatchProgress, media?: MediaItem) => {
+  updateProgress: (progress, media, profileId = get().activeProfileId) => {
     if (!isProgress(progress) || progress.durationSeconds <= 0) return;
     const positionSeconds = Math.min(progress.positionSeconds, progress.durationSeconds);
     progress = { ...progress, positionSeconds, percentage: positionSeconds / progress.durationSeconds * 100 };
-    set((state) => {
+    updateProfileState(profileId, (state) => {
       const key = progress.episodeId || progress.mediaId;
       const updatedProgress = { ...state.progress, [key]: progress };
-
-      let newHistory = [...state.history];
-      const existingIdx = newHistory.findIndex((h) =>
+      const history = [...state.history];
+      const existingIdx = history.findIndex((item) =>
         progress.episodeId
-          ? h.progress.episodeId === progress.episodeId
-          : h.media.id === progress.mediaId && !h.progress.episodeId
+          ? item.progress.episodeId === progress.episodeId
+          : item.media.id === progress.mediaId && !item.progress.episodeId
       );
-
-      const mediaToStore = media || newHistory[existingIdx]?.media;
+      const mediaToStore = media || history[existingIdx]?.media;
       if (mediaToStore) {
-        const historyItem = {
-          media: mediaToStore,
-          progress,
-          lastWatchedAt: Date.now(),
-        };
-
-        if (existingIdx >= 0) {
-          newHistory.splice(existingIdx, 1);
-          newHistory.unshift(historyItem);
-        } else {
-          newHistory.unshift(historyItem);
-        }
-
+        if (existingIdx >= 0) history.splice(existingIdx, 1);
+        history.unshift({ media: mediaToStore, progress, lastWatchedAt: Date.now() });
       }
-
-      const newState = {
-        progress: updatedProgress,
-        history: newHistory,
-      };
-
-      saveState({ ...state, ...newState });
-
-      return newState;
+      return { progress: updatedProgress, history };
     });
   },
 
-  getProgress: (mediaId: string, episodeId?: string) => {
-    const state = get();
+  getProgress: (mediaId, episodeId, profileId = get().activeProfileId) => {
+    const state = getProfileState(profileId);
+    if (!state) return undefined;
     const key = episodeId || mediaId;
     return state.progress[key] ?? (!episodeId
       ? state.history.find((h) => h.media.id === mediaId)?.progress : undefined);
@@ -499,8 +606,12 @@ function mergeWatchlists(current: Watchlist[], incoming: Watchlist[]): Watchlist
   return [...merged.values()];
 }
 
-export function mergeWatchBackup(backup: WatchRecords): void {
-  theiaStore.setState((state) => {
+export function mergeWatchBackup(
+  backup: WatchRecords,
+  profileId = theiaStore.getState().activeProfileId,
+  removedFavorites?: ReadonlySet<string>,
+): void {
+  updateProfileState(profileId, (state) => {
     const progress = new Map(Object.entries(state.progress));
     for (const [key, incoming] of Object.entries(backup.progress)) {
       if ((progress.get(key)?.updatedAt ?? -1) < incoming.updatedAt) progress.set(key, incoming);
@@ -516,14 +627,14 @@ export function mergeWatchBackup(backup: WatchRecords): void {
         });
       }
     }
-    const favorites = new Map([...backup.favorites, ...state.favorites].map((media) => [media.id, media]));
+    const favorites = new Map([...backup.favorites, ...state.favorites.filter((media) => !removedFavorites?.has(media.id))]
+      .map((media) => [media.id, media]));
     const records = {
       progress: Object.fromEntries(progress),
       history: [...history.values()].sort((a, b) => b.lastWatchedAt - a.lastWatchedAt),
       favorites: [...favorites.values()],
       watchlists: backup.watchlists?.length ? mergeWatchlists(state.watchlists, backup.watchlists) : state.watchlists,
     };
-    saveState({ ...state, ...records });
     return records;
   });
 }
@@ -543,9 +654,13 @@ export function importWatchBackup(backup: WatchRecords): void {
     && entry.progress.updatedAt >= (before.progress[entry.progress.episodeId || entry.media.id]?.updatedAt ?? 0)));
 }
 
-export function removeSyncedHistory(key: string, remoteTimestamp: number): void {
-  theiaStore.setState(state => {
-    if ((state.progress[key]?.updatedAt ?? 0) > remoteTimestamp) return state;
+export function removeSyncedHistory(
+  key: string,
+  remoteTimestamp: number,
+  profileId = theiaStore.getState().activeProfileId,
+): void {
+  updateProfileState(profileId, state => {
+    if ((state.progress[key]?.updatedAt ?? 0) > remoteTimestamp) return {};
     const progress = { ...state.progress };
     delete progress[key];
     return { progress, history: state.history.filter(entry => (entry.progress.episodeId || entry.media.id) !== key) };

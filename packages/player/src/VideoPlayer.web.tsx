@@ -5,7 +5,7 @@ import { useVideoSubtitles } from './useVideoSubtitles';
 import { preferredTrackIndex } from './languages';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
-import { theiaStore, proxyResourceUrl, refreshTraktResume, traktResumePosition, traktStatus } from '@theia/core';
+import { theiaStore, proxyResourceUrl, refreshTraktResume, traktResumePosition, traktStatus, DEFAULT_PROFILE_ID } from '@theia/core';
 import { colors, TouchSlider, SubtitleStepper } from '@theia/ui';
 import { VideoPlayerProps, AspectRatioMode } from './types';
 import { playerStyles, PlayerIcon } from './playerChrome';
@@ -139,7 +139,8 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const mediaKey = episode?.id || media.id;
-  const scrobble = React.useMemo(() => createScrobbleSession(media, episode), [mediaKey]);
+  const profileId = useRef(theiaStore.getState().activeProfileId).current;
+  const scrobble = React.useMemo(() => createScrobbleSession(media, episode, profileId), [mediaKey, profileId]);
   const resumeRequest = useRef(0);
   const lastPosition = useRef<{ key: string; time: number } | null>(null);
   const requestedTime = useRef(0);
@@ -151,15 +152,15 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
       positionSeconds: video.currentTime, durationSeconds: video.duration, percentage,
       completed: isPlaybackCompleted(video.currentTime, video.duration, video.ended, media.type === 'series', stream.creditsStartSeconds, completionPolicy), updatedAt: Date.now(),
-    }, media);
-  }, [media, episode, stream.creditsStartSeconds, completionPolicy]);
+    }, media, profileId);
+  }, [media, episode, stream.creditsStartSeconds, completionPolicy, profileId]);
   const saveProgress = useCallback(() => saveVideoProgress(videoRef.current), [saveVideoProgress]);
 
   const nextEpisodeCallback = useRef(onNextEpisode);
   nextEpisodeCallback.current = onNextEpisode;
   const embedSession = `${mediaKey}:${stream.id}:${stream.url}:${initialTime ?? 'auto'}`;
   const embedStart = React.useMemo(() => {
-    const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+    const saved = theiaStore.getState().getProgress(media.id, episode?.id, profileId);
     if (videoRef.current && videoRef.current.currentTime > 0) return videoRef.current.currentTime;
     if (lastPosition.current?.key === mediaKey) return lastPosition.current.time;
     return initialTime ?? (theiaStore.getState().settings.autoResume && saved && !saved.completed ? saved.positionSeconds : 0);
@@ -183,7 +184,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
         mediaId: media.id, episodeId: episode?.id, season: episode?.season, episode: episode?.episode,
         positionSeconds: latest.time, durationSeconds: latest.duration, percentage,
         completed: isPlaybackCompleted(latest.time, latest.duration, latest.ended, media.type === 'series', stream.creditsStartSeconds, completionPolicy), updatedAt: Date.now(),
-      }, media);
+      }, media, profileId);
       lastSave = Date.now();
     };
     const receive = (event: MessageEvent) => {
@@ -210,7 +211,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', hidden);
     };
-  }, [embedSession, media, episode, hasNextEpisode, stream.creditsStartSeconds, completionPolicy]);
+  }, [embedSession, media, episode, hasNextEpisode, stream.creditsStartSeconds, completionPolicy, profileId]);
 
   useEffect(() => {
     setSubtitleOffsetMs(theiaStore.getState().getSubtitleOffset(media.id));
@@ -229,7 +230,7 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
     const settings = theiaStore.getState().settings;
     video.volume = settings.volume / 100;
     video.muted = settings.muted;
-    const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+    const saved = theiaStore.getState().getProgress(media.id, episode?.id, profileId);
     requestedTime.current = lastPosition.current?.key === mediaKey ? lastPosition.current.time
       : initialTime !== undefined ? Math.max(0, initialTime)
       : settings.autoResume && saved && !saved.completed ? saved.positionSeconds : 0;
@@ -602,12 +603,12 @@ export const VideoPlayerWeb: React.FC<VideoPlayerProps> = ({
             const fromBeginning = initialTime === 0 || lastPosition.current?.key === mediaKey;
             const canResume = !fromBeginning && (initialTime !== undefined || theiaStore.getState().settings.autoResume);
             if (canResume) {
-              const connected = traktStatus.getState().connected;
+              const connected = profileId === DEFAULT_PROFILE_ID && traktStatus.getState().connected;
               if (connected) {
-                await refreshTraktResume();
+                await refreshTraktResume(profileId);
                 if (request !== resumeRequest.current || videoRef.current !== video) return;
               }
-              const saved = theiaStore.getState().getProgress(media.id, episode?.id);
+              const saved = theiaStore.getState().getProgress(media.id, episode?.id, profileId);
               if (connected || saved?.resumeByPercentage) requestedTime.current = traktResumePosition(saved, video.duration);
             }
             setDuration(Number.isFinite(video.duration) ? video.duration : 0);

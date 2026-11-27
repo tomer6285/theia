@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import type { Episode, MediaItem, WatchProgress } from '../types';
-import { mergeWatchBackup, removeSyncedHistory, theiaStore, type StorageAdapter } from './index';
+import { DEFAULT_PROFILE_ID, getProfileState, mergeWatchBackup, removeSyncedHistory, theiaStore, type StorageAdapter } from './index';
 
 const API = 'https://api.trakt.tv';
 const AUTH = 'https://auth.trakt.tv';
@@ -179,7 +179,7 @@ async function restore(config: TraktPlatform, tokens: Tokens, account: string, u
   const journal: Journal = raw ? JSON.parse(raw) : { queue: [], favorites: [], history: {}, playback: {} };
   const session = { platform: config, tokens, account, journal, controller: new AbortController() };
   if (upload) {
-    const { history, favorites } = theiaStore.getState();
+    const { history, favorites } = getProfileState(DEFAULT_PROFILE_ID)!;
     for (const { media, progress, lastWatchedAt } of history) {
       const target = targetFor(media, progress);
       if (!target || progress.percentage < 1) continue;
@@ -242,7 +242,7 @@ export async function finishTraktAuthorization(callback: string) {
 }
 
 export async function connectTrakt(signal?: AbortSignal) {
-  if (!platform || connection || signal?.aborted) return;
+  if (!platform || connection || signal?.aborted || theiaStore.getState().activeProfileId !== DEFAULT_PROFILE_ID) return;
   const config = platform;
   const { state, verifier, challenge } = await config.makeProof();
   if (signal?.aborted) return;
@@ -276,9 +276,9 @@ function schedule(delay: number) {
   timer = setTimeout(() => { void syncTrakt(); }, Math.max(delay, retryAt - Date.now()));
 }
 
-function enqueue(mutation: Mutation) {
+function enqueue(mutation: Mutation, profileId = theiaStore.getState().activeProfileId) {
   const session = connection;
-  if (!session || applying) return;
+  if (!session || applying || profileId !== DEFAULT_PROFILE_ID) return;
   const queue = session.journal.queue;
   const previous = queue[queue.length - 1];
   if (previous?.kind === 'scrobble' && mutation.kind === 'scrobble' && !previous.attemptedAt && !(running && queue.length === 1)
@@ -289,11 +289,11 @@ function enqueue(mutation: Mutation) {
   schedule(100);
 }
 
-export function trackTraktPlayback(action: PlaybackAction, media: MediaItem, episode: Episode | undefined, percent: number) {
+export function trackTraktPlayback(action: PlaybackAction, media: MediaItem, episode: Episode | undefined, percent: number, profileId?: string) {
   const target = targetFor(media, episode);
   if (!target || !Number.isFinite(percent) || (action !== 'start' && percent < 1)) return;
   enqueue({ kind: 'scrobble', action, target, key: episode?.id || media.id,
-    progress: Math.max(0, Math.min(percent, 100)), at: Date.now() });
+    progress: Math.max(0, Math.min(percent, 100)), at: Date.now() }, profileId);
 }
 
 export function removeTraktWatch(key: string) {
@@ -312,7 +312,8 @@ export function queueTraktImport(history: ReturnType<typeof theiaStore.getState>
 
 function subscribeTraktFavorites() {
   return theiaStore.subscribe((state, previous) => {
-    if (!connection || applying || state.favorites === previous.favorites) return;
+    if (!connection || applying || state.favorites === previous.favorites
+      || state.activeProfileId !== DEFAULT_PROFILE_ID || previous.activeProfileId !== state.activeProfileId) return;
     const old = new Set(previous.favorites.map(({ id }) => id));
     const current = new Set(state.favorites.map(({ id }) => id));
     for (const media of state.favorites) if (!old.has(media.id) && favoriteBody(media)) enqueue({ kind: 'favorite', media, add: true });
@@ -393,7 +394,7 @@ async function pull(session: Connection) {
   const records: Parameters<typeof mergeWatchBackup>[0] = { progress: {}, history: [], favorites: [] };
   const remoteHistory: Record<string, number> = {};
   const remotePlayback: Record<string, number> = {};
-  const state = theiaStore.getState();
+  const state = getProfileState(DEFAULT_PROFILE_ID)!;
   const existingHistory = new Map(state.history.map(item => [keyOf(item.progress), item.media]));
   const mediaByKey = new Map<string, MediaItem>();
   const pendingRemovals = new Map(session.journal.queue.flatMap(item => item.kind === 'remove' ? [[item.key, item.at] as const] : []));
@@ -431,15 +432,13 @@ async function pull(session: Connection) {
   applying = true;
   try {
     const removedFavorites = new Set(session.journal.favorites.filter(id => !remoteFavorites.has(id) && !pendingFavorites.has(id)));
-    const nextFavorites = state.favorites.filter(item => !removedFavorites.has(item.id));
-    if (nextFavorites.length !== state.favorites.length) theiaStore.setState({ favorites: nextFavorites });
     for (const key of new Set([...Object.keys(session.journal.history), ...Object.keys(session.journal.playback)])) {
       // Starting playback removes a Trakt checkpoint. Only remote history disappearance signals removal.
       if (session.journal.history[key] && !(key in remoteHistory) && !(key in remotePlayback)) {
-        removeSyncedHistory(key, Math.max(session.journal.history[key], session.journal.playback[key] ?? 0));
+        removeSyncedHistory(key, Math.max(session.journal.history[key], session.journal.playback[key] ?? 0), DEFAULT_PROFILE_ID);
       }
     }
-    mergeWatchBackup(records);
+    mergeWatchBackup(records, DEFAULT_PROFILE_ID, removedFavorites);
   } finally {
     applying = false;
   }
@@ -495,8 +494,8 @@ export function syncTrakt(): Promise<void> {
   return running;
 }
 
-export async function refreshTraktResume() {
-  if (connection && Date.now() - lastPull > 30000) {
+export async function refreshTraktResume(profileId = theiaStore.getState().activeProfileId) {
+  if (profileId === DEFAULT_PROFILE_ID && connection && Date.now() - lastPull > 30000) {
     await Promise.race([syncTrakt(), new Promise(resolve => setTimeout(resolve, 1500))]);
   }
 }

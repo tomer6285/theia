@@ -2,7 +2,8 @@ import 'react-native-url-polyfill/auto';
 import { initializeTrakt } from '../src/trakt';
 import React, { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setStorageAdapter } from '@theia/core';
+import { ProfilePicker } from '../src/HouseholdProfiles';
+import { selectProfile, setStorageAdapter, theiaStore } from '@theia/core';
 import { View, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -12,10 +13,18 @@ export default function RootLayout() {
   useEffect(() => { void setStorageAdapter(AsyncStorage).then(() => setReady(true)); }, []);
   useEffect(() => { if (ready) return initializeTrakt(); }, [ready]);
   if (!ready) return <View style={{ flex: 1, backgroundColor: '#09090b', justifyContent: 'center' }}><ActivityIndicator color="#06b6d4" /></View>;
+  return <ViewerLaunch />;
+}
+
+function ViewerLaunch() {
+  const [showPicker, setShowPicker] = useState(() => theiaStore.getState().profiles.length > 1);
   return (
     <>
       <StatusBar style="light" />
-      <Stack
+      {showPicker ? <ProfilePicker onSelect={(id) => {
+        selectProfile(id);
+        setShowPicker(false);
+      }} /> : <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: '#09090b' },
@@ -33,7 +42,7 @@ export default function RootLayout() {
             navigationBarHidden: true,
           }}
         />
-      </Stack>
+      </Stack>}
     </>
   );
 }
