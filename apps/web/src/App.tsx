@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { MediaItem, StreamSource, Episode, theiaStore, providerManager } from '@theia/core';
+import React, { useState, useRef, useEffect, useSyncExternalStore, lazy, Suspense } from 'react';
+import { MediaItem, StreamSource, Episode, selectProfile, theiaStore, providerManager } from '@theia/core';
 import { TouchPill } from '@theia/ui';
 const VideoPlayer = lazy(() => import('@theia/player').then((module) => ({ default: module.VideoPlayer })));
 import { BottomNav, TabType } from './components/BottomNav';
@@ -10,8 +10,21 @@ import { ContinueWatchingView } from './components/ContinueWatchingView';
 import { LibraryView } from './components/LibraryView';
 import { SettingsView } from './components/SettingsView';
 import { MediaDetailModal } from './components/MediaDetailModal';
+import { ProfilePicker } from './components/HouseholdProfiles';
+
+const getActiveProfileId = () => theiaStore.getState().activeProfileId;
 
 export const App: React.FC = () => {
+  const [showPicker, setShowPicker] = useState(() => theiaStore.getState().profiles.length > 1);
+  const activeProfileId = useSyncExternalStore(theiaStore.subscribe, getActiveProfileId);
+  if (showPicker) return <ProfilePicker onSelect={(id) => {
+    selectProfile(id);
+    setShowPicker(false);
+  }} />;
+  return <ViewerApp key={activeProfileId} />;
+};
+
+const ViewerApp: React.FC = () => {
   const [nextLoading, setNextLoading] = useState(false);
   const [nextError, setNextError] = useState('');
   const nextController = useRef<AbortController | null>(null);

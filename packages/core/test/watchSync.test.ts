@@ -64,7 +64,7 @@ describe('watch sync', () => {
     vi.resetModules();
     const {
       configureTrakt, connectTrakt, disconnectTrakt, finishTraktAuthorization, syncTrakt,
-      theiaStore, traktResumePosition,
+      addProfile, DEFAULT_PROFILE_ID, selectProfile, theiaStore, traktResumePosition,
     } = await import('../src/storage');
     const date = new Date().toISOString();
     const remoteMovie = { title: movie.title, ids: { imdb: movie.id, trakt: 1 } };
@@ -101,7 +101,14 @@ describe('watch sync', () => {
       await expect(finishTraktAuthorization(redirectUri + '?code=code&state=wrong')).rejects.toThrow();
       expect(fetch).not.toHaveBeenCalled();
       await finishTraktAuthorization(redirectUri + '?code=code&state=correct');
+      addProfile('Sam');
+      selectProfile(theiaStore.getState().profiles[1].id);
+      const samFavorite = { ...movie, id: 'tt56789' };
+      theiaStore.getState().toggleFavorite(samFavorite);
       await syncTrakt();
+      expect(theiaStore.getState().favorites).toEqual([samFavorite]);
+      expect(theiaStore.getState().getProgress(movie.id)).toBeUndefined();
+      selectProfile(DEFAULT_PROFILE_ID);
       expect(traktResumePosition(theiaStore.getState().getProgress(movie.id), 1000)).toBe(420);
       expect(remoteFavorite).toBe(true);
       expect(theiaStore.getState().favorites.map(item => item.id)).toEqual([movie.id]);

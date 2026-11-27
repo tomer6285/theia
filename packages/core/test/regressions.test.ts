@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CinemetaClient } from '../src/metadata';
 import { ProviderManager } from '../src/providers';
 import { fetchWithTimeout, fetchProviderResponse } from '../src/network/request';
-import { DefaultStorageAdapter, setStorageAdapter, theiaStore, saveState } from '../src/storage';
+import { addProfile, DEFAULT_PROFILE_ID, DefaultStorageAdapter, selectProfile, setStorageAdapter, theiaStore, saveState } from '../src/storage';
 import { formatSubtitleTimestamp, offsetSubtitlesVTT, parseSubtitles } from '../src/subtitles';
 import type { MediaItem, WatchProgress } from '../src/types';
 
@@ -50,6 +50,64 @@ describe('persistent state', () => {
     saveState(state);
     expect(adapter.getItem('theia_store')).not.toBeNull();
   });
+  it.each(['theia_store', 'dion_tc_store'])('migrates %s and isolates delayed playback saves across profiles', async (key) => {
+    const episodeId = 'tt1:1:1';
+    const saved = progress(episodeId);
+    const persisted = new Map([[key, JSON.stringify({
+      progress: { [episodeId]: saved },
+      history: [{ media, progress: saved, lastWatchedAt: 1000 }],
+      favorites: [media],
+      watchlists: [{ id: 'legacy-list', name: 'Legacy list', items: [media] }],
+      subtitleOffsets: { [media.id]: 150 },
+      settings: { preferredSubtitles: ['es'], proxyUrl: 'https://proxy.example' },
+    })]]);
+    const adapter = {
+      getItem: async (name: string) => persisted.get(name) ?? null,
+      setItem: async (name: string, value: string) => { persisted.set(name, value); },
+      removeItem: async (name: string) => { persisted.delete(name); },
+    };
+
+    await setStorageAdapter(adapter);
+    expect(theiaStore.getState().profiles).toEqual([{ id: DEFAULT_PROFILE_ID, name: 'Default' }]);
+    addProfile('Sam');
+    const [, sam] = theiaStore.getState().profiles;
+    expect(theiaStore.getState().activeProfileId).toBe(DEFAULT_PROFILE_ID);
+    selectProfile(sam.id);
+    const viewer = theiaStore.getState();
+    expect(viewer.favorites).toEqual([]);
+    expect(viewer.watchlists).toEqual([]);
+    const samList = viewer.createWatchlist("Sam’s list", media);
+    expect(viewer.history).toEqual([]);
+    expect(viewer.settings.proxyUrl).toBe('https://proxy.example');
+    expect(viewer.getSubtitleOffset(media.id)).toBe(0);
+    viewer.updateProgress(progress(episodeId, 60), media);
+    viewer.updateSettings({ preferredSubtitles: [] });
+    viewer.setSubtitleOffset(media.id, -100);
+    viewer.updateProgress(progress(episodeId, 40), media, DEFAULT_PROFILE_ID);
+
+    expect(viewer.getProgress(media.id, episodeId, DEFAULT_PROFILE_ID)?.positionSeconds).toBe(40);
+
+    // Rehydrate while writes are pending, as on a subsequent launch.
+    await setStorageAdapter(adapter);
+    const defaultViewer = theiaStore.getState();
+    expect(defaultViewer.activeProfileId).toBe(DEFAULT_PROFILE_ID);
+    expect(defaultViewer.favorites).toEqual([media]);
+    expect(defaultViewer.watchlists).toEqual([{ id: 'legacy-list', name: 'Legacy list', items: [media] }]);
+    expect(defaultViewer.history[0].progress.positionSeconds).toBe(40);
+    expect(defaultViewer.getProgress(media.id, episodeId)?.positionSeconds).toBe(40);
+    expect(defaultViewer.getSubtitleOffset(media.id)).toBe(150);
+    expect(defaultViewer.settings.preferredSubtitles).toEqual(['es']);
+
+    selectProfile(sam.id);
+    const samViewer = theiaStore.getState();
+    expect(samViewer.getProgress(media.id, episodeId)?.positionSeconds).toBe(60);
+    expect(samViewer.history[0].progress.positionSeconds).toBe(60);
+    expect(samViewer.favorites).toEqual([]);
+    expect(samViewer.watchlists).toEqual([{ id: samList, name: "Sam’s list", items: [media] }]);
+    expect(samViewer.getSubtitleOffset(media.id)).toBe(-100);
+    expect(samViewer.settings.preferredSubtitles).toEqual([]);
+  });
+
   it('serializes asynchronous writes to prevent older saves overwriting newer state', async () => {
     const values: string[] = [];
     let release!: () => void;
@@ -64,7 +122,7 @@ describe('persistent state', () => {
     await vi.waitFor(() => expect(calls).toBe(1));
     release();
     await vi.waitFor(() => expect(values).toHaveLength(2));
-    expect(JSON.parse(values[1]).subtitleOffsets.tt1).toBe(200);
+    expect(JSON.parse(values[1]).profiles[0].data.subtitleOffsets.tt1).toBe(200);
   });
 });
 

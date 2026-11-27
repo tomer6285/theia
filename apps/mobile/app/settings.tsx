@@ -1,14 +1,23 @@
 import React, { useState, useSyncExternalStore } from 'react';
 import { Button, ScrollView, Text } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useWatchState } from '@theia/ui';
+import { HouseholdProfiles } from '../src/HouseholdProfiles';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import {
-  connectTrakt, describeWatchBackup, disconnectTrakt, exportWatchBackup, importWatchBackup,
+  DEFAULT_PROFILE_ID, connectTrakt, describeWatchBackup, disconnectTrakt, exportWatchBackup, importWatchBackup,
   readWatchBackup, reportTraktError, syncTrakt, traktStatus, WATCH_BACKUP_FILENAME,
 } from '@theia/core';
 
 export default function SettingsScreen() {
+  const { activeProfileId } = useWatchState();
+  return <ViewerSettings key={activeProfileId} canUseTrakt={activeProfileId === DEFAULT_PROFILE_ID} />;
+}
+
+function ViewerSettings({ canUseTrakt }: { canUseTrakt: boolean }) {
+  const router = useRouter();
   const status = useSyncExternalStore(traktStatus.subscribe, traktStatus.getState);
   const [busy, setBusy] = useState(false);
   const [backup, setBackup] = useState<ReturnType<typeof readWatchBackup>>();
@@ -22,9 +31,10 @@ export default function SettingsScreen() {
   };
 
   const exportBackup = async () => {
+    const data = exportWatchBackup();
     if (!FileSystem.cacheDirectory || !(await Sharing.isAvailableAsync())) throw new Error('Sharing is unavailable.');
     const uri = FileSystem.cacheDirectory + WATCH_BACKUP_FILENAME;
-    await FileSystem.writeAsStringAsync(uri, exportWatchBackup());
+    await FileSystem.writeAsStringAsync(uri, data);
     await Sharing.shareAsync(uri, { mimeType: 'application/json' });
   };
 
@@ -38,6 +48,7 @@ export default function SettingsScreen() {
   };
 
   return <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }}>
+    <HouseholdProfiles onSwitch={() => { if (router.canDismiss()) router.dismissAll(); else router.replace('/'); }} />
     <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>Watch backup</Text>
     <Button title="Export JSON" disabled={busy} onPress={() => void run(exportBackup, () => setMessage('Could not export the watch backup.'))} />
     <Button title="Import JSON" disabled={busy} onPress={() => void run(selectBackup, () => setMessage('Choose a valid Theia watch backup.'))} />
@@ -51,7 +62,7 @@ export default function SettingsScreen() {
       <Button title="Cancel" onPress={() => setBackup(undefined)} />
     </>}
     {message ? <Text accessibilityLiveRegion="polite" style={{ color: '#fff' }}>{message}</Text> : null}
-    {status.available && <>
+    {canUseTrakt && status.available && <>
       <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>Trakt watch sync</Text>
       {status.connected ? <>
         <Text style={{ color: '#fff' }}>{status.syncing ? 'Syncing…' : status.lastSync

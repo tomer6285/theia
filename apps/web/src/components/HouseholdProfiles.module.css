@@ -1,0 +1,116 @@
+.picker {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 100dvh;
+  gap: 24px;
+  padding: 32px 20px;
+  color: #f4f4f5;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  max-width: 660px;
+}
+
+.picker .choice {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: 144px;
+  padding: 16px 12px;
+  overflow-wrap: anywhere;
+}
+
+.initial {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #122b34;
+  color: #67e8f9;
+  font-size: 24px;
+  font-weight: 750;
+}
+
+.card {
+  padding: 22px;
+  border: 1.5px solid #27272a;
+  border-radius: 20px;
+  background: #121216;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.list {
+  list-style: none;
+  margin: 8px 0 16px;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #27272a;
+  overflow-wrap: anywhere;
+}
+
+.row small {
+  color: #a1a1aa;
+}
+
+.actions {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.field {
+  display: grid;
+  flex: 1 1 140px;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.confirmation {
+  width: 100%;
+}
+
+.card input, .card button, .picker button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #3f3f46;
+  border-radius: 10px;
+  background: #1c1c22;
+  color: #f4f4f5;
+  font: inherit;
+}
+
+.card input {
+  width: 100%;
+}
+
+.card button, .picker button {
+  cursor: pointer;
+}
+
+.card button:hover, .picker button:hover {
+  border-color: #48d1ea;
+}
+
+.card button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
