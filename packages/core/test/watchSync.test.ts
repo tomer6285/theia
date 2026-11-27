@@ -27,7 +27,7 @@ describe('watch sync', () => {
     expect(JSON.parse(raw)).not.toHaveProperty('settings');
     state.updateProgress({ ...sample, positionSeconds: 12, updatedAt: 2000 }, movie);
     state.dismissContinueWatching(movie.id);
-    expect(() => readWatchBackup(raw.replace('"version": 1', '"version": 2'))).toThrow();
+    expect(() => readWatchBackup(raw.replace('"version": 2', '"version": 3'))).toThrow();
     importWatchBackup(readWatchBackup(raw));
     expect(theiaStore.getState().getProgress(movie.id)?.positionSeconds).toBe(12);
     expect(theiaStore.getState().history[0].dismissedFromContinueWatching).toBe(true);

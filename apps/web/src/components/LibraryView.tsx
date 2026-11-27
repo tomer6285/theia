@@ -4,6 +4,7 @@ import { MediaCard, useWatchState } from '@theia/ui';
 import { groupHistory, HistoryCard } from './HistoryCard';
 import { HistoryConfirmation } from './HistoryConfirmation';
 import { HistoryOptions } from './HistoryOptions';
+import { Watchlists } from './Watchlists';
 import styles from './HistoryCard.module.css';
 
 interface LibraryViewProps {
@@ -13,7 +14,7 @@ interface LibraryViewProps {
 
 export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia, onQuickPlay }) => {
   useWatchState();
-  const [activeTab, setActiveTab] = useState<'favorites' | 'history'>('favorites');
+  const [activeTab, setActiveTab] = useState<'favorites' | 'history' | 'lists'>('favorites');
   const [confirmClear, setConfirmClear] = useState(false);
   const { favorites, history } = theiaStore.getState();
   const historyGroups = activeTab === 'history' ? groupHistory(history) : [];
@@ -27,8 +28,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectMedia, onQuick
           onClick={() => setActiveTab('favorites')}>Favorites</button>
         <button type="button" aria-pressed={activeTab === 'history'}
           onClick={() => setActiveTab('history')}>History</button>
+        <button type="button" aria-pressed={activeTab === 'lists'}
+          onClick={() => setActiveTab('lists')}>Lists</button>
       </div>
-      {activeTab === 'favorites' ? (
+      {activeTab === 'lists' ? <Watchlists onSelectMedia={onSelectMedia} /> : activeTab === 'favorites' ? (
         favorites.length === 0 ? (
           <div className={styles.empty}>
             <h2>No favorites yet</h2>

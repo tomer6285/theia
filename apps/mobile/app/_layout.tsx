@@ -24,6 +24,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="settings" options={{ headerShown: true, title: "Settings", headerStyle: { backgroundColor: "#09090b" }, headerTintColor: "#fff" }} />
+        <Stack.Screen name="lists" options={{ headerShown: true, title: "Lists", headerStyle: { backgroundColor: "#09090b" }, headerTintColor: "#fff" }} />
         <Stack.Screen name="media/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen
           name="player"

@@ -1,3 +1,4 @@
+import { AddToWatchlist } from '../../src/watchlists';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -115,6 +116,8 @@ export default function MediaDetailScreen() {
             onPress={() => theiaStore.getState().toggleFavorite(media)} style={{ paddingVertical: 12 }}>
             <Text style={styles.epPlayIcon}>{favorite ? 'Remove from favorites' : 'Add to favorites'}</Text>
           </TouchableOpacity>
+
+          <AddToWatchlist key={media.id} media={media} />
 
           {media.description && (
             <Text style={styles.description}>{media.description}</Text>
