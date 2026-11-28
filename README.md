@@ -1,22 +1,48 @@
 # Theia
 
-A touch-friendly media browser and player for web, Electron, and Android, built with TypeScript and React.
+Theia is a touch-friendly app for browsing movies and shows, watching them, and keeping track of what you’ve seen. Use it in a browser or on desktop and Android.
 
-## Workspace
+## Get Theia
 
-- `packages/core`: metadata, provider discovery, provider token compatibility, subtitles, and persisted watch state.
-- `packages/ui`: web components, dark theme, accessible controls, and dialogs.
-- `packages/player`: HLS/HTML video player for web; Expo AV and WebView player for React Native.
-- `apps/web`: Vite app with search, movie/show catalogs, favorites, history, and settings.
-- `apps/mobile`: Expo Router Android app with native playback and AsyncStorage persistence.
-- `apps/electron`: sandboxed desktop wrapper and application packaging.
-- `services/edge-proxy`: Cloudflare Worker for provider discovery and media routing. The development web server uses the same implementation.
+Look for desktop downloads and Android APKs on the [Releases page](https://github.com/tomer6285/theia/releases). To run Theia in a browser on your own network, use Docker Compose.
 
-App source is included in version control; generated bundles, installers, native build folders, and dependencies are ignored.
+## Self-host with Docker Compose
 
-## Development
+Clone the repository and run the included [Compose file](docker-compose.yml) from the project folder.
 
-Use Node.js 22 and the pnpm version declared in `package.json`.
+```bash
+git clone https://github.com/tomer6285/theia.git
+cd theia
+docker compose up -d --build
+```
+
+Open http://localhost:3000 on the Docker host. Leave **Settings → Playback proxy address** blank to use the built-in proxy.
+
+To watch from other devices on your home network, set `THEIA_BIND_IP` to the Docker host’s LAN IP in a `.env` file next to the Compose file. Run `docker compose up -d` again, then open `http://<host-lan-ip>:3000` on your other devices.
+
+If you expose Theia to the internet, put it behind an HTTPS reverse proxy with access controls and rate limits. Set `ALLOWED_HOSTS` in `.env` to a comma-separated list of trusted streaming provider and CDN hostnames. Include any CDN hostnames your streams need. The host list applies to playback requests made by the proxy.
+
+### Trakt on a self-hosted site
+
+Playback works over HTTP on your LAN. For Trakt sign-in from another device, open Theia at an HTTPS address. Register that origin and its callback URL with your Trakt app, then add the public client ID and the callback URL to `.env`. For example, if your site is at `https://theia.example.com`:
+
+```dotenv
+VITE_TRAKT_CLIENT_ID=your-trakt-client-id
+VITE_TRAKT_WEB_REDIRECT_URI=https://theia.example.com/
+```
+
+Run `docker compose up -d --build` to apply those settings, then connect Trakt in **Settings**. When you open Theia at exactly `http://localhost:3000`, the default Trakt development setup can also work.
+
+## Watching and keeping your progress
+
+- Browse or search for a movie or show. Try another server if a stream fails.
+- Use the player to choose subtitles or an audio track when available. External embedded players have their own controls and may not save progress in Theia.
+- Use **Settings → Watch backup** to export or import your progress, history, favorites, and custom lists. The backup excludes credentials and playback settings.
+- Connect Trakt in **Settings** to sync watch history, progress, and favorites across devices.
+
+## Run from source
+
+Use Node.js 22 and the pnpm version listed in `package.json`.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -24,74 +50,4 @@ pnpm build
 pnpm --filter @theia/web dev
 ```
 
-The web app runs at `http://localhost:3000` and listens on all network interfaces, so other devices can use `http://<this-machine-lan-ip>:3000`. Shared packages build before their dependents. `pnpm build` compiles the shared packages, Worker, web app, and Electron wrapper; it does not create an Android APK or desktop installer.
-
-```bash
-pnpm test       # Core, proxy, player, UI, app-flow and dependency compatibility tests
-pnpm typecheck  # Checks all seven packages/apps, including mobile
-pnpm lint       # Currently runs type checks; no separate style linter is configured
-```
-
-CI runs these checks and exports the Android JavaScript bundle.
-
-## Playback proxy
-
-Browser requests to some providers and media CDNs need a proxy because of CORS. The local Vite app automatically uses its same-origin `/api/proxy`, including when opened over a LAN IP. Leaving **Settings → Playback proxy address** blank uses this automatic route; a custom endpoint overrides it. Static production builds use a direct connection until a proxy is configured.
-
-For a hosted web app, deploy `services/edge-proxy` and enter its full HTTPS address. Static Vite output does not include a proxy server. Electron bundles the same proxy implementation and starts a private loopback endpoint automatically; no separately hosted proxy is needed. Leave the playback proxy setting blank to use it, or enter a custom endpoint to override it. Desktop playback still requires internet access to metadata and streaming providers.
-
-The Worker handles GET/HEAD and byte ranges, preserves cancellation, follows validated redirects, and rewrites HLS playlist references, alternate tracks, initialization files, and encryption keys. Provider HTML can be fetched for discovery but is served as inert text. Application cookies and authorization headers are not forwarded upstream.
-
-Before exposing a proxy publicly, configure the Worker's `ALLOWED_HOSTS` binding with a comma-separated list of trusted provider/CDN hostnames. `*.example.com` allows subdomains. Configure deployment access and rate limits for your environment. The hostname checks reject local addresses and non-HTTP URLs, but do not independently resolve DNS; an allowlist should contain hosts you control or trust.
-
-## Desktop
-
-```bash
-pnpm build:electron
-pnpm start:electron
-pnpm dist:electron:linux
-```
-
-Other `dist:electron:*` scripts select Windows/macOS and architecture targets. The packaged app copies the web bundle into its resources and uses relative asset paths. Platform installers/signing require the corresponding build environment and credentials.
-
-## Android
-
-Native launcher/splash images derive from the web SVG mark. Run `pnpm assets:mobile` to regenerate them after updating the logo.
-
-```bash
-pnpm --filter @theia/mobile start
-pnpm --filter @theia/mobile exec expo export --platform android --output-dir dist --no-bytecode --max-workers 2
-```
-
-Run `./release.sh --android-only` from the repo root to build a signed APK in Expo EAS. Sign in first with `npx eas-cli@latest login`. The first build prompts you to link or create an EAS project and configure Android signing. Download the APK from the build link printed by EAS. The native entry points resolve shared source, so Metro does not require prebuilt shared `dist` folders.
-
-Direct streams use Expo AV with native controls, saved resume positions, request headers, and automatic next-episode resolution. Embeds use WebView. Keep-awake and landscape orientation are scoped to the player screen. AsyncStorage hydrates before the app mounts.
-
-## Watch backup and Trakt sync
-
-Use **Settings → Watch backup** to export progress, history, favorites, and custom lists as JSON or merge a backup from another device. Backups work offline and exclude credentials and playback settings.
-
-To enable Trakt in a build, register a Trakt API app and configure its redirect URIs. Use the public client ID with PKCE. The integration uses these environment variables at build time.
-
-| Client | Client ID | Redirect URI |
-| --- | --- | --- |
-| Web | `VITE_TRAKT_CLIENT_ID` | `VITE_TRAKT_WEB_REDIRECT_URI` |
-| Electron | `VITE_TRAKT_CLIENT_ID` | `VITE_TRAKT_DESKTOP_REDIRECT_URI` |
-| Android | `EXPO_PUBLIC_TRAKT_CLIENT_ID` | `EXPO_PUBLIC_TRAKT_REDIRECT_URI` |
-
-- **Web** needs its production HTTPS origin registered for Trakt CORS. The redirect URI must serve the Theia app, such as its root URL. The connection lasts for the browser tab's session.
-- **Local web** defaults to Theia's Trakt Development client ID and the `http://localhost:3000/` callback when opened at `http://localhost:3000`. To use your own Trakt Development app, override `VITE_TRAKT_CLIENT_ID` and register `http://localhost:3000/` as the redirect URI and `http://localhost:3000` as the allowed origin. Every other callback requires HTTPS.
-- **Electron** opens Trakt in the default browser. It defaults to Theia's Trakt Development registration and briefly listens on `http://localhost:3000/` to finish sign-in. If a local web server is using port 3000, stop it before connecting. For a Trakt Production registration, deploy the edge worker from `services/edge-proxy` with its `TRAKT_ATTEMPTS` Durable Object binding, register its HTTPS `/trakt/callback` URL with Trakt, and set `VITE_TRAKT_DESKTOP_REDIRECT_URI` and the matching `VITE_TRAKT_CLIENT_ID` before rebuilding. Electron saves credentials using the system keyring.
-- **Android** needs an HTTPS callback ending in `/settings` on a domain you control. Serve `/.well-known/assetlinks.json` for `com.theia.app` with the installed APK signing certificate's SHA-256 fingerprint. Use a callback distinct from the Web callback and rebuild the APK after configuring the domain.
-
-Connect the same account in Settings on each device. Connecting merges existing local watch history, progress, and favorites into Trakt. Trakt stores remote resume points on pause or exit and logs a completed viewing around its 80% threshold. Automatic scrobbling is available for direct playback. Unsynced changes retry when the connection is available again.
-
-## Playback behavior and limits
-
-Web playback supports timeline/keyboard seeking, brightness and volume gestures, a control lock, server switching, HLS audio language selection, and automatic subtitles with timing adjustments. The web player chooses full captions in your preferred language (English by default), discovers HLS/native-browser and external SRT/WebVTT tracks, and remembers explicit language/Off choices for subsequent episodes. VixSrc discovery consumes its short-lived embed token immediately and extracts a signed HLS playlist for the built-in player; it does not load a sandbox-incompatible iframe. Preferences control resume and automatic next-episode playback. Next episodes resolve fresh streams.
-
-Third-party embeds manage their own playback, captions, and progress. Theia cannot inspect their cross-origin playback state, so external embeds do not provide Theia watch-progress tracking or reliable automatic next-episode playback. Native external subtitle synchronization and the custom web gesture HUD are not implemented. Provider availability depends on external services and is not guaranteed by the local tests.
-
-The web manifest supports a standalone presentation; offline media and service-worker caching are not implemented.
-
-See [AUDIT.md](AUDIT.md) for audit findings, verification, dependency risks, and validation limits.
+Open http://localhost:3000. For desktop, run `pnpm start:electron` after building. For Android development, run `pnpm --filter @theia/mobile start`.

@@ -24,7 +24,7 @@ export function publicUrl(value: string): URL {
   return url;
 }
 
-export function rewritePlaylist(content: string, upstream: string, proxy: URL, referer: string): string {
+export function rewritePlaylist(content: string, upstream: string, proxy: URL, referer: string, relative = false): string {
   const route = (uri: string) => {
     const resolved = new URL(uri, upstream);
     // Leave non-network URIs (e.g. data: keys) in the player.
@@ -32,7 +32,7 @@ export function rewritePlaylist(content: string, upstream: string, proxy: URL, r
     const result = new URL(proxy);
     result.searchParams.set('url', resolved.href);
     result.searchParams.set('referer', referer);
-    return result.href;
+    return relative ? result.pathname + result.search : result.href;
   };
   return content.split(/\r?\n/).map((line) => {
     const trimmed = line.trim();
@@ -46,7 +46,7 @@ export function rewritePlaylist(content: string, upstream: string, proxy: URL, r
 }
 
 export default {
-  async fetch(request: Request, env?: { ALLOWED_HOSTS?: string }): Promise<Response> {
+  async fetch(request: Request, env?: { ALLOWED_HOSTS?: string; relativePlaylistUrls?: boolean }): Promise<Response> {
     const allowedHosts = env?.ALLOWED_HOSTS?.split(',').map((host) => host.trim().toLowerCase()).filter(Boolean);
     const isAllowed = (target: URL) => !allowedHosts?.length || allowedHosts.some((host) =>
       target.hostname === host || (host.startsWith('*.') && target.hostname.endsWith(host.slice(1))));
@@ -106,7 +106,7 @@ export default {
         return new Response(null, { status: response.status, headers: responseHeaders });
       }
       if (isPlaylist && response.ok) {
-        const rewritten = rewritePlaylist(await response.text(), targetUrl.href, url, referer.href);
+        const rewritten = rewritePlaylist(await response.text(), targetUrl.href, url, referer.href, env?.relativePlaylistUrls);
         responseHeaders.set('Content-Type', 'application/vnd.apple.mpegurl');
         responseHeaders.delete('ETag');
         return new Response(rewritten, { status: response.status, headers: responseHeaders });

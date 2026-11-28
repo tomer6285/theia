@@ -1,0 +1,12 @@
+services:
+  theia:
+    build:
+      context: .
+      args:
+        VITE_TRAKT_CLIENT_ID: ${VITE_TRAKT_CLIENT_ID:-}
+        VITE_TRAKT_WEB_REDIRECT_URI: ${VITE_TRAKT_WEB_REDIRECT_URI:-}
+    ports:
+      - "${THEIA_BIND_IP:-127.0.0.1}:3000:3000"
+    environment:
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
+    restart: unless-stopped

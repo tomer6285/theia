@@ -5,8 +5,9 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 
-// Vite serves discovery and media through the same LAN-accessible origin.
-setDefaultProxyUrl(window.theiaElectron?.proxyUrl || (import.meta.env.DEV ? '/api/proxy' : ''));
+setDefaultProxyUrl(window.theiaElectron?.proxyUrl
+  || import.meta.env.VITE_PLAYBACK_PROXY_URL
+  || (import.meta.env.DEV ? '/api/proxy' : ''));
 
 // Dialogs restore focus programmatically; track input so mouse users do not
 // inherit a keyboard focus ring when a dialog closes.
